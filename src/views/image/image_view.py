@@ -511,7 +511,7 @@ class ImageView(ft.Container):
             content=ft.Text(message),
             duration=3000,
         )
-        self._saved_page.open(snackbar)
+        self._saved_page.show_dialog(snackbar)
     
     def _open_compress_dialog(self, e: ft.ControlEvent) -> None:
         """切换到图片压缩工具界面。

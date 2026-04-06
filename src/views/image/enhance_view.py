@@ -25,6 +25,7 @@ from constants.model_config import ImageEnhanceModelInfo
 from services import ConfigService, ImageService
 from services.image_service import ImageEnhancer
 from utils import format_file_size, get_unique_path
+from utils.file_utils import pick_files, get_directory_path
 
 
 class ImageEnhanceView(ft.Container):
@@ -831,7 +832,7 @@ class ImageEnhanceView(ft.Container):
     def _show_manual_download_dialog(self, error: str) -> None:
         """显示手动下载对话框。"""
         def close_dialog(e: ft.ControlEvent) -> None:
-            self._page.close(dialog)
+            self._page.pop_dialog()
         
         def open_url_and_close(e: ft.ControlEvent, url: str) -> None:
             webbrowser.open(url)
@@ -898,7 +899,7 @@ class ImageEnhanceView(ft.Container):
             actions_alignment=ft.MainAxisAlignment.END,
         )
         
-        self._page.open(dialog)
+        self._page.show_dialog(dialog)
     
     def _on_back_click(self, e: ft.ControlEvent) -> None:
         """返回按钮点击事件。"""
@@ -913,11 +914,11 @@ class ImageEnhanceView(ft.Container):
         
         if self.enhancer:
             def confirm_switch(confirm_e: ft.ControlEvent) -> None:
-                self._page.close(dialog)
+                self._page.pop_dialog()
                 self._switch_model(new_model_key)
             
             def cancel_switch(cancel_e: ft.ControlEvent) -> None:
-                self._page.close(dialog)
+                self._page.pop_dialog()
                 self.model_selector.value = self.current_model_key
                 self.model_selector.update()
             
@@ -932,7 +933,7 @@ class ImageEnhanceView(ft.Container):
                 actions_alignment=ft.MainAxisAlignment.END,
             )
             
-            self._page.open(dialog)
+            self._page.show_dialog(dialog)
         else:
             self._switch_model(new_model_key)
     
@@ -1025,7 +1026,7 @@ class ImageEnhanceView(ft.Container):
     def _on_unload_model(self, e: ft.ControlEvent) -> None:
         """卸载模型按钮点击事件。"""
         def confirm_unload(confirm_e: ft.ControlEvent) -> None:
-            self._page.close(dialog)
+            self._page.pop_dialog()
             
             if self.enhancer:
                 self.enhancer = None
@@ -1037,7 +1038,7 @@ class ImageEnhanceView(ft.Container):
                 self._show_snackbar("模型未加载", ft.Colors.ORANGE)
         
         def cancel_unload(cancel_e: ft.ControlEvent) -> None:
-            self._page.close(dialog)
+            self._page.pop_dialog()
         
         estimated_memory = int(self.current_model.size_mb * 1.2)
         
@@ -1055,12 +1056,12 @@ class ImageEnhanceView(ft.Container):
             actions_alignment=ft.MainAxisAlignment.END,
         )
         
-        self._page.open(dialog)
+        self._page.show_dialog(dialog)
     
     def _on_delete_model(self, e: ft.ControlEvent) -> None:
         """删除模型按钮点击事件。"""
         def confirm_delete(confirm_e: ft.ControlEvent) -> None:
-            self._page.close(dialog)
+            self._page.pop_dialog()
             
             if self.enhancer:
                 self.enhancer = None
@@ -1085,7 +1086,7 @@ class ImageEnhanceView(ft.Container):
                 self._show_snackbar(f"删除模型失败: {ex}", ft.Colors.RED)
         
         def cancel_delete(cancel_e: ft.ControlEvent) -> None:
-            self._page.close(dialog)
+            self._page.pop_dialog()
         
         dialog = ft.AlertDialog(
             modal=True,
@@ -1107,11 +1108,11 @@ class ImageEnhanceView(ft.Container):
             actions_alignment=ft.MainAxisAlignment.END,
         )
         
-        self._page.open(dialog)
+        self._page.show_dialog(dialog)
     
     async def _on_select_files(self, e: ft.ControlEvent) -> None:
         """选择文件按钮点击事件。"""
-        result = await ft.FilePicker().pick_files(
+        result = await pick_files(self._page,
             dialog_title="选择图片文件",
             allowed_extensions=["jpg", "jpeg", "jfif", "png", "bmp", "webp", "tiff"],
             allow_multiple=True,
@@ -1128,7 +1129,7 @@ class ImageEnhanceView(ft.Container):
     
     async def _on_select_folder(self, e: ft.ControlEvent) -> None:
         """选择文件夹按钮点击事件。"""
-        result = await ft.FilePicker().get_directory_path(dialog_title="选择包含图片的文件夹")
+        result = await get_directory_path(self._page, dialog_title="选择包含图片的文件夹")
         
         if result:
             folder_path = Path(result)
@@ -1244,7 +1245,7 @@ class ImageEnhanceView(ft.Container):
     
     async def _on_browse_output(self, e: ft.ControlEvent) -> None:
         """浏览输出目录按钮点击事件。"""
-        result = await ft.FilePicker().get_directory_path(dialog_title="选择输出目录")
+        result = await get_directory_path(self._page, dialog_title="选择输出目录")
         
         if result:
             self.custom_output_dir.value = result
@@ -1464,7 +1465,7 @@ class ImageEnhanceView(ft.Container):
             bgcolor=color,
             duration=3000,
         )
-        self._page.open(snackbar)
+        self._page.show_dialog(snackbar)
     
     def add_files(self, files: list) -> None:
         """从拖放添加文件。"""

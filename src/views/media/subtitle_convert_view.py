@@ -18,6 +18,7 @@ from constants import (
 )
 from services import ConfigService
 from utils import format_file_size, logger, get_unique_path
+from utils.file_utils import pick_files, get_directory_path
 from utils.subtitle_utils import (
     parse_subtitle_file,
     segments_to_srt,
@@ -362,10 +363,11 @@ class SubtitleConvertView(ft.Container):
     
     async def _on_select_files(self, e: ft.ControlEvent) -> None:
         """选择文件按钮点击事件。"""
-        result = await ft.FilePicker().pick_files(
-            allow_multiple=True,
-            allowed_extensions=['srt', 'vtt', 'lrc', 'ass', 'ssa', 'txt'],
+        result = await pick_files(
+            self._page,
             dialog_title="选择字幕文件",
+            allowed_extensions=['srt', 'vtt', 'lrc', 'ass', 'ssa', 'txt'],
+            allow_multiple=True,
         )
         if result and result.files:
             for f in result.files:
@@ -377,7 +379,7 @@ class SubtitleConvertView(ft.Container):
     
     async def _on_select_folder(self, e: ft.ControlEvent) -> None:
         """选择文件夹按钮点击事件。"""
-        result = await ft.FilePicker().get_directory_path(dialog_title="选择字幕文件夹")
+        result = await get_directory_path(self._page, dialog_title="选择字幕文件夹")
         if result:
             folder = Path(result)
             for file_path in folder.iterdir():
@@ -481,7 +483,7 @@ class SubtitleConvertView(ft.Container):
     
     async def _on_browse_output(self, e: ft.ControlEvent) -> None:
         """浏览输出目录。"""
-        result = await ft.FilePicker().get_directory_path(dialog_title="选择输出目录")
+        result = await get_directory_path(self._page, dialog_title="选择输出目录")
         if result:
             self.custom_output_dir.value = result
             self._page.update()
@@ -649,7 +651,7 @@ class SubtitleConvertView(ft.Container):
             bgcolor=color,
             duration=2000,
         )
-        self._page.open(snackbar)
+        self._page.show_dialog(snackbar)
     
     def cleanup(self) -> None:
         """清理视图资源，释放内存。"""

@@ -29,6 +29,7 @@ from constants import (
 )
 from services import ConfigService, FFmpegService, SpeechRecognitionService, TranslateService, VADService, VocalSeparationService, AISubtitleFixService, SUPPORTED_LANGUAGES
 from utils import format_file_size, logger, get_system_fonts, get_unique_path
+from utils.file_utils import pick_files, get_directory_path
 from utils.subtitle_utils import segments_to_srt
 from views.media.ffmpeg_install_view import FFmpegInstallView
 
@@ -1146,7 +1147,8 @@ class VideoSubtitleView(ft.Container):
     
     async def _on_select_files(self) -> None:
         """选择文件。"""
-        files = await ft.FilePicker().pick_files(
+        files = await pick_files(
+            self._page,
             dialog_title="选择视频文件",
             allowed_extensions=["mp4", "avi", "mkv", "mov", "wmv", "flv", "webm", "m4v"],
             allow_multiple=True,
@@ -1543,7 +1545,7 @@ class VideoSubtitleView(ft.Container):
                 shape=ft.RoundedRectangleBorder(radius=BORDER_RADIUS_MEDIUM),
             )
             
-            self._page.open(preview_dialog)
+            self._page.show_dialog(preview_dialog)
             
         except Exception as ex:
             logger.error(f"预览字幕效果失败: {ex}", exc_info=True)
@@ -1551,7 +1553,7 @@ class VideoSubtitleView(ft.Container):
     
     def _close_preview_dialog(self, dialog: ft.AlertDialog) -> None:
         """关闭预览对话框。"""
-        self._page.close(dialog)
+        self._page.pop_dialog()
     
     def _get_video_settings(self, file_path: Path) -> Dict[str, Any]:
         """获取视频的字幕设置（如果有自定义设置则使用，否则使用全局设置）。"""
@@ -1968,7 +1970,8 @@ class VideoSubtitleView(ft.Container):
         # 对话框内的字体文件选择
         async def pick_font_file_async():
             """打开字体文件选择器。"""
-            files = await ft.FilePicker().pick_files(
+            files = await pick_files(
+                self._page,
                 dialog_title="选择字体文件",
                 allowed_extensions=["ttf", "otf", "ttc", "woff", "woff2"],
                 allow_multiple=False,
@@ -2218,7 +2221,7 @@ class VideoSubtitleView(ft.Container):
         
         def cleanup_and_close():
             """清理资源并关闭对话框。"""
-            self._page.close(dialog)
+            self._page.pop_dialog()
         
         def save_settings(e):
             """保存设置。"""
@@ -2326,7 +2329,7 @@ class VideoSubtitleView(ft.Container):
             shape=ft.RoundedRectangleBorder(radius=BORDER_RADIUS_MEDIUM),
         )
         
-        self._page.open(dialog)
+        self._page.show_dialog(dialog)
         
         # 初始渲染预览
         render_preview()
@@ -2963,7 +2966,7 @@ class VideoSubtitleView(ft.Container):
             content_padding=0,
         )
         
-        self._page.open(self.font_selector_dialog)
+        self._page.show_dialog(self.font_selector_dialog)
         
         # 加载第一页
         self._update_font_page()
@@ -2971,7 +2974,7 @@ class VideoSubtitleView(ft.Container):
     def _close_font_selector_dialog(self) -> None:
         """关闭字体选择对话框。"""
         if hasattr(self, 'font_selector_dialog'):
-            self._page.close(self.font_selector_dialog)
+            self._page.pop_dialog()
     
     def _filter_font_list(self, e: ft.ControlEvent) -> None:
         """筛选字体列表。"""
@@ -3067,7 +3070,8 @@ class VideoSubtitleView(ft.Container):
     
     async def _pick_font_file(self) -> None:
         """打开文件选择器选择字体文件。"""
-        files = await ft.FilePicker().pick_files(
+        files = await pick_files(
+            self._page,
             dialog_title="选择字体文件",
             allowed_extensions=["ttf", "otf", "ttc", "woff", "woff2"],
             allow_multiple=False,
@@ -3122,11 +3126,11 @@ class VideoSubtitleView(ft.Container):
     def _on_delete_model(self, e: ft.ControlEvent) -> None:
         """删除模型按钮点击事件。"""
         def confirm_delete(e):
-            self._page.close(dialog)
+            self._page.pop_dialog()
             self._do_delete_model()
         
         def cancel_delete(e):
-            self._page.close(dialog)
+            self._page.pop_dialog()
         
         dialog = ft.AlertDialog(
             modal=True,
@@ -3138,7 +3142,7 @@ class VideoSubtitleView(ft.Container):
             ],
             actions_alignment=ft.MainAxisAlignment.END,
         )
-        self._page.open(dialog)
+        self._page.show_dialog(dialog)
     
     def _do_delete_model(self) -> None:
         """执行删除模型操作。"""
@@ -3495,8 +3499,8 @@ class VideoSubtitleView(ft.Container):
     
     async def _select_output_dir(self) -> None:
         """选择输出目录。"""
-        folder_path = await ft.FilePicker().get_directory_path(
-            dialog_title="选择输出目录"
+        folder_path = await get_directory_path(
+            self._page, dialog_title="选择输出目录"
         )
         if folder_path:
             self.output_dir_field.value = folder_path
@@ -4116,7 +4120,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
     def _show_snackbar(self, message: str) -> None:
         """显示提示消息。"""
         snackbar = ft.SnackBar(content=ft.Text(message))
-        self._page.open(snackbar)
+        self._page.show_dialog(snackbar)
     
     def add_files(self, files: list) -> None:
         """从拖放添加文件。"""
@@ -4144,7 +4148,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
             self._show_snackbar(f"已添加 {added_count} 个文件")
         elif skipped_count > 0:
             snackbar = ft.SnackBar(content=ft.Text("视频字幕不支持该格式"), bgcolor=ft.Colors.ORANGE)
-            self._page.open(snackbar)
+            self._page.show_dialog(snackbar)
     
     def cleanup(self) -> None:
         """清理视图资源，释放内存。"""

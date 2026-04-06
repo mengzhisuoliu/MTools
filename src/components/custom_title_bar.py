@@ -4,6 +4,7 @@
 提供自定义标题栏，包含窗口控制、主题切换等功能。
 """
 
+import os
 import sys
 import threading
 from pathlib import Path
@@ -817,59 +818,37 @@ class CustomTitleBar(ft.Container):
         
         page = self._get_page()
         if not page:
-            # 如果页面引用丢失，强制退出
-            sys.exit(0)
-            return
+            os._exit(0)
         
         # 防止重复触发关闭流程
         if getattr(self, "_closing_started", False):
             return
         self._closing_started = True
         
-        # 设置关闭标记，防止后台任务继续操作 page
-        if hasattr(page, '_main_view') and hasattr(page._main_view, '_is_closing'):
-            page._main_view._is_closing = True
-        
-        # 停止全局热键监听，避免进程退出被后台监听线程拖慢
+        # 保存窗口状态
         try:
-            if hasattr(page, "_main_view") and hasattr(page._main_view, "global_hotkey_service"):
-                page._main_view.global_hotkey_service.stop()
+            if self.config_service:
+                self.config_service.set_config_value("window_maximized", page.window.maximized)
+                if not page.window.maximized:
+                    if page.window.left is not None and page.window.top is not None:
+                        self.config_service.set_config_value("window_left", page.window.left)
+                        self.config_service.set_config_value("window_top", page.window.top)
+                    if page.window.width is not None and page.window.height is not None:
+                        self.config_service.set_config_value("window_width", page.window.width)
+                        self.config_service.set_config_value("window_height", page.window.height)
         except Exception:
             pass
         
-        # 在关闭前保存窗口位置、大小和最大化状态
-        if self.config_service:
-            # 保存最大化状态
-            self.config_service.set_config_value("window_maximized", page.window.maximized)
-            
-            # 只在非最大化时保存窗口位置和大小
-            if not page.window.maximized:
-                if page.window.left is not None and page.window.top is not None:
-                    self.config_service.set_config_value("window_left", page.window.left)
-                    self.config_service.set_config_value("window_top", page.window.top)
-                if page.window.width is not None and page.window.height is not None:
-                    self.config_service.set_config_value("window_width", page.window.width)
-                    self.config_service.set_config_value("window_height", page.window.height)
+        # 启动保底线程：若 destroy 未能退出，强制终止
+        threading.Thread(target=lambda: (threading.Event().wait(1.5), os._exit(0)), daemon=True).start()
         
-        # 停止托盘图标
-        if self.tray_icon:
-            self.tray_icon.stop()
-            self.tray_icon = None
-        
-        # 关闭窗口 (异步方法，避免同步阻塞退出)
-        async def _do_close():
-            import asyncio
-            # 天气服务关闭设置超时，避免网络清理阻塞退出
-            if self.weather_service:
-                try:
-                    await asyncio.wait_for(self.weather_service.close(), timeout=0.6)
-                except Exception:
-                    pass
+        # 异步销毁 Flutter 窗口（窗口关闭后 Flet 会自行结束进程）
+        async def _do_destroy():
             try:
-                await page.window.close()
-            except RuntimeError:
-                pass  # Session closed
-        page.run_task(_do_close)
+                await page.window.destroy()
+            except Exception:
+                os._exit(0)
+        page.run_task(_do_destroy)
     
     async def _load_weather_data(self):
         """加载天气数据"""
@@ -951,7 +930,7 @@ class CustomTitleBar(ft.Container):
                 if self.config_service:
                     self.config_service.set_config_value("weather_city", city)
                 # 关闭对话框
-                self._page.close(dialog)
+                self._page.pop_dialog()
                 # 重新加载天气
                 self._page.run_task(self._load_weather_data)
             else:
@@ -962,12 +941,12 @@ class CustomTitleBar(ft.Container):
             # 清除城市设置，使用自动定位
             if self.config_service:
                 self.config_service.set_config_value("weather_city", "")
-            self._page.close(dialog)
+            self._page.pop_dialog()
             # 重新加载天气
             self._page.run_task(self._load_weather_data)
         
         def close_dialog(e):
-            self._page.close(dialog)
+            self._page.pop_dialog()
         
         # 创建对话框
         dialog = ft.AlertDialog(
@@ -995,7 +974,7 @@ class CustomTitleBar(ft.Container):
             actions_alignment=ft.MainAxisAlignment.END,
         )
         
-        self._page.open(dialog)
+        self._page.show_dialog(dialog)
     
     def set_weather_visibility(self, visible: bool) -> None:
         """设置天气显示状态

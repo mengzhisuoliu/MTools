@@ -244,11 +244,13 @@ class FeatureCard(ft.Container):
             menu_icon = ft.Icons.PUSH_PIN
         
         # 获取点击位置
-        local_x = e.local_x if hasattr(e, 'local_x') else 0
-        local_y = e.local_y if hasattr(e, 'local_y') else 0
+        local_x = e.local_position.x if hasattr(e, 'local_position') else 0
+        local_y = e.local_position.y if hasattr(e, 'local_position') else 0
         
         def close_menu(ev):
-            self.page.close(menu_container)
+            if menu_container in self.page.overlay:
+                self.page.overlay.remove(menu_container)
+                self.page.update()
         
         def on_menu_click(ev):
             close_menu(ev)
@@ -297,14 +299,15 @@ class FeatureCard(ft.Container):
                 ),
                 ft.Container(
                     content=menu_card,
-                    left=e.global_x if hasattr(e, 'global_x') else 200,
-                    top=e.global_y if hasattr(e, 'global_y') else 200,
+                    left=e.global_position.x if hasattr(e, 'global_position') else 200,
+                    top=e.global_position.y if hasattr(e, 'global_position') else 200,
                 ),
             ],
             expand=True,
         )
         
-        self.page.open(menu_container)
+        self.page.overlay.append(menu_container)
+        self.page.update()
     
     def _menu_item_hover(self, e: ft.HoverEvent, item: ft.Container) -> None:
         """菜单项悬停效果。"""

@@ -446,18 +446,18 @@ class CryptoToolView(ft.Container):
                 height=450,
             ),
             actions=[
-                ft.TextButton("关闭", on_click=lambda _: self._page.close(dialog)),
+                ft.TextButton("关闭", on_click=lambda _: self._page.pop_dialog()),
             ],
         )
         
-        self._page.open(dialog)
+        self._page.show_dialog(dialog)
     
     def _show_snack(self, message: str, error: bool = False):
         snackbar = ft.SnackBar(
             content=ft.Text(message),
             bgcolor=ft.Colors.RED_400 if error else ft.Colors.GREEN_400,
         )
-        self._page.open(snackbar)
+        self._page.show_dialog(snackbar)
     
     def cleanup(self) -> None:
         """清理视图资源，释放内存。"""

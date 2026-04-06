@@ -17,6 +17,7 @@ from constants import (
 )
 from services import ConfigService, EncodingService
 from utils import format_file_size
+from utils.file_utils import pick_files, get_directory_path
 
 
 class EncodingConvertView(ft.Container):
@@ -335,14 +336,15 @@ class EncodingConvertView(ft.Container):
         # 文本文件扩展名（去掉点号）
         extensions: List[str] = [ext.lstrip('.') for ext in self.encoding_service.TEXT_FILE_EXTENSIONS]
         
-        result = await ft.FilePicker().pick_files(
+        result = await pick_files(
+            self._page,
             dialog_title="选择文本文件",
             allowed_extensions=extensions,
             allow_multiple=True,
         )
         
-        if result and result.files:
-            new_files: List[Path] = [Path(f.path) for f in result.files]
+        if result:
+            new_files: List[Path] = [Path(f.path) for f in result]
             for new_file in new_files:
                 if new_file not in self.selected_files:
                     self.selected_files.append(new_file)
@@ -350,7 +352,7 @@ class EncodingConvertView(ft.Container):
     
     async def _on_select_folder(self, e: ft.ControlEvent) -> None:
         """选择文件夹按钮点击事件。"""
-        result = await ft.FilePicker().get_directory_path(dialog_title="选择文本文件夹")
+        result = await get_directory_path(self._page, dialog_title="选择文本文件夹")
         
         if result:
             folder: Path = Path(result)
@@ -490,7 +492,7 @@ class EncodingConvertView(ft.Container):
     
     async def _on_browse_output(self, e: ft.ControlEvent) -> None:
         """浏览输出目录按钮点击事件。"""
-        result = await ft.FilePicker().get_directory_path(dialog_title="选择输出目录")
+        result = await get_directory_path(self._page, dialog_title="选择输出目录")
         
         if result:
             self.custom_output_dir.value = result
@@ -570,7 +572,7 @@ class EncodingConvertView(ft.Container):
             bgcolor=color,
             duration=2000,
         )
-        self._page.open(snackbar)
+        self._page.show_dialog(snackbar)
     
     def add_files(self, files: list) -> None:
         """从拖放添加文件。

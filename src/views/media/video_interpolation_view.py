@@ -27,6 +27,7 @@ from constants.model_config import FrameInterpolationModelInfo
 from services import ConfigService, FFmpegService
 from services.frame_interpolation_service import FrameInterpolationService
 from utils import format_file_size, logger, get_unique_path
+from utils.file_utils import pick_files, get_directory_path
 from views.media.ffmpeg_install_view import FFmpegInstallView
 
 
@@ -842,7 +843,7 @@ class VideoInterpolationView(ft.Container):
     def _on_unload_model(self, e: ft.ControlEvent) -> None:
         """卸载模型按钮点击事件。"""
         def confirm_unload(confirm_e: ft.ControlEvent) -> None:
-            self._page.close(dialog)
+            self._page.pop_dialog()
             
             if self.interpolator:
                 self.interpolator.unload_model()
@@ -855,7 +856,7 @@ class VideoInterpolationView(ft.Container):
                 self._show_snackbar("模型未加载", ft.Colors.ORANGE)
         
         def cancel_unload(cancel_e: ft.ControlEvent) -> None:
-            self._page.close(dialog)
+            self._page.pop_dialog()
         
         estimated_memory = int(self.current_model.size_mb * 1.2)
         
@@ -879,7 +880,7 @@ class VideoInterpolationView(ft.Container):
             actions_alignment=ft.MainAxisAlignment.END,
         )
         
-        self._page.open(dialog)
+        self._page.show_dialog(dialog)
     
     def _on_auto_load_change(self, e: ft.ControlEvent) -> None:
         """自动加载模型复选框变化事件。"""
@@ -894,7 +895,7 @@ class VideoInterpolationView(ft.Container):
     def _on_delete_model(self, e: ft.ControlEvent) -> None:
         """删除模型按钮点击事件。"""
         def confirm_delete(confirm_e: ft.ControlEvent) -> None:
-            self._page.close(dialog)
+            self._page.pop_dialog()
             
             # 如果模型已加载，先卸载
             if self.interpolator:
@@ -915,7 +916,7 @@ class VideoInterpolationView(ft.Container):
                 self._show_snackbar(f"删除模型失败: {ex}", ft.Colors.RED)
         
         def cancel_delete(cancel_e: ft.ControlEvent) -> None:
-            self._page.close(dialog)
+            self._page.pop_dialog()
         
         dialog = ft.AlertDialog(
             modal=True,
@@ -946,11 +947,12 @@ class VideoInterpolationView(ft.Container):
             actions_alignment=ft.MainAxisAlignment.END,
         )
         
-        self._page.open(dialog)
+        self._page.show_dialog(dialog)
     
     async def _on_select_files(self) -> None:
         """选择文件按钮点击事件。"""
-        files = await ft.FilePicker().pick_files(
+        files = await pick_files(
+            self._page,
             dialog_title="选择视频文件",
             allowed_extensions=["mp4", "mkv", "mov", "avi", "wmv", "flv", "webm"],
             allow_multiple=True,
@@ -966,7 +968,7 @@ class VideoInterpolationView(ft.Container):
     
     async def _on_select_folder(self) -> None:
         """选择文件夹按钮点击事件。"""
-        folder_path = await ft.FilePicker().get_directory_path(dialog_title="选择包含视频文件的文件夹")
+        folder_path = await get_directory_path(self._page, dialog_title="选择包含视频文件的文件夹")
         if folder_path:
             folder = Path(folder_path)
             video_extensions = {".mp4", ".mkv", ".mov", ".avi", ".wmv", ".flv", ".webm"}
@@ -1139,7 +1141,7 @@ class VideoInterpolationView(ft.Container):
     
     async def _on_browse_output(self) -> None:
         """浏览输出目录。"""
-        folder_path = await ft.FilePicker().get_directory_path(dialog_title="选择输出目录")
+        folder_path = await get_directory_path(self._page, dialog_title="选择输出目录")
         if folder_path:
             self.custom_output_dir.value = folder_path
             self._page.update()
@@ -1279,13 +1281,13 @@ class VideoInterpolationView(ft.Container):
         if self.is_processing:
             # 显示确认对话框
             def confirm_exit(confirm_e: ft.ControlEvent) -> None:
-                self._page.close(dialog)
+                self._page.pop_dialog()
                 self.cleanup()
                 if self.on_back:
                     self.on_back()
             
             def cancel_exit(cancel_e: ft.ControlEvent) -> None:
-                self._page.close(dialog)
+                self._page.pop_dialog()
             
             dialog = ft.AlertDialog(
                 title=ft.Text("确认退出"),
@@ -1296,7 +1298,7 @@ class VideoInterpolationView(ft.Container):
                 ],
             )
             
-            self._page.open(dialog)
+            self._page.show_dialog(dialog)
         else:
             if self.on_back:
                 self.on_back()
@@ -1971,7 +1973,7 @@ class VideoInterpolationView(ft.Container):
                 bgcolor=color,
                 duration=3000,
             )
-            self._page.open(snackbar)
+            self._page.show_dialog(snackbar)
         except Exception:
             pass
     

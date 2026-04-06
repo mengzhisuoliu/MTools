@@ -11,6 +11,7 @@ from typing import Callable, List, Optional
 import flet as ft
 
 from constants import PADDING_MEDIUM, PADDING_SMALL, PADDING_LARGE
+from utils.file_utils import pick_files, save_file
 
 
 class TextDiffView(ft.Container):
@@ -647,15 +648,16 @@ class TextDiffView(ft.Container):
 
     async def _import_file(self, side: str):
         """从文件导入文本。"""
-        result = await ft.FilePicker().pick_files(
+        result = await pick_files(
+            self._page,
             dialog_title="选择文本文件",
             allowed_extensions=["txt", "log", "md", "py", "js", "json", "xml", "html", "css", "java", "c", "cpp"],
         )
         
-        if not result or not result.files:
+        if not result:
             return
         
-        file_path = result.files[0].path
+        file_path = result[0].path
         try:
             # 尝试 UTF-8
             with open(file_path, 'r', encoding='utf-8') as f:
@@ -678,7 +680,7 @@ class TextDiffView(ft.Container):
             input_field.update()
             self._update_stats(side)
         
-        self._show_snack(f"已导入: {result.files[0].name}")
+        self._show_snack(f"已导入: {result[0].name}")
 
     def _paste_text(self, side: str):
         """粘贴文本。"""
@@ -720,7 +722,8 @@ class TextDiffView(ft.Container):
         )
         
         # 保存文件
-        result = await ft.FilePicker().save_file(
+        result = await save_file(
+            self._page,
             dialog_title="导出 HTML",
             file_name="text_diff.html",
             allowed_extensions=["html"],
@@ -784,11 +787,11 @@ class TextDiffView(ft.Container):
                 height=450,
             ),
             actions=[
-                ft.TextButton("关闭", on_click=lambda _: self._page.close(dialog)),
+                ft.TextButton("关闭", on_click=lambda _: self._page.pop_dialog()),
             ],
         )
         
-        self._page.open(dialog)
+        self._page.show_dialog(dialog)
 
     def _show_snack(self, message: str, error: bool = False):
         """显示提示消息。"""
@@ -796,7 +799,7 @@ class TextDiffView(ft.Container):
             content=ft.Text(message),
             bgcolor=ft.Colors.ERROR if error else ft.Colors.PRIMARY,
         )
-        self._page.open(snackbar)
+        self._page.show_dialog(snackbar)
 
     def _on_back_click(self):
         """返回按钮点击。"""

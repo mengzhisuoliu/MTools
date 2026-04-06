@@ -20,6 +20,7 @@ from constants import (
 )
 from services import ConfigService, FFmpegService
 from utils import format_file_size, logger, get_unique_path
+from utils.file_utils import pick_files, get_directory_path
 from views.media.ffmpeg_install_view import FFmpegInstallView
 
 
@@ -385,10 +386,11 @@ class TSMergeView(ft.Container):
     
     async def _on_select_files(self, e: ft.ControlEvent) -> None:
         """选择文件按钮点击事件。"""
-        result = await ft.FilePicker().pick_files(
-            allow_multiple=True,
-            allowed_extensions=['ts', 'm2ts', 'mts'],
+        result = await pick_files(
+            self._page,
             dialog_title="选择 TS 文件",
+            allowed_extensions=['ts', 'm2ts', 'mts'],
+            allow_multiple=True,
         )
         if result and result.files:
             for f in result.files:
@@ -402,7 +404,7 @@ class TSMergeView(ft.Container):
     
     async def _on_select_folder(self, e: ft.ControlEvent) -> None:
         """选择文件夹按钮点击事件。"""
-        result = await ft.FilePicker().get_directory_path(dialog_title="选择包含 TS 文件的文件夹")
+        result = await get_directory_path(self._page, dialog_title="选择包含 TS 文件的文件夹")
         if result:
             folder = Path(result)
             for file_path in folder.iterdir():
@@ -528,7 +530,7 @@ class TSMergeView(ft.Container):
     
     async def _on_browse_output(self, e: ft.ControlEvent) -> None:
         """浏览输出目录。"""
-        result = await ft.FilePicker().get_directory_path(dialog_title="选择输出目录")
+        result = await get_directory_path(self._page, dialog_title="选择输出目录")
         if result:
             self.custom_output_dir.value = result
             self._page.update()
@@ -665,7 +667,7 @@ class TSMergeView(ft.Container):
             bgcolor=color,
             duration=2000,
         )
-        self._page.open(snackbar)
+        self._page.show_dialog(snackbar)
     
     def cleanup(self) -> None:
         """清理视图资源。"""

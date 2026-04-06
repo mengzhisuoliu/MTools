@@ -17,6 +17,7 @@ from constants import (
     PADDING_SMALL,
 )
 from utils import format_file_size, logger
+from utils.file_utils import pick_files
 
 
 class ImageToUrlView(ft.Container):
@@ -254,7 +255,8 @@ class ImageToUrlView(ft.Container):
     
     async def _on_select_files(self, e: ft.ControlEvent) -> None:
         """选择文件按钮点击事件。"""
-        result = await ft.FilePicker().pick_files(
+        result = await pick_files(
+            self._page,
             dialog_title="选择图片文件",
             allowed_extensions=["jpg", "jpeg", "png", "gif", "webp", "svg"],
             allow_multiple=True,
@@ -661,7 +663,7 @@ class ImageToUrlView(ft.Container):
             bgcolor=color,
             duration=2000,
         )
-        self._page.open(snackbar)
+        self._page.show_dialog(snackbar)
     
     def add_files(self, files: list) -> None:
         """从拖放添加文件。

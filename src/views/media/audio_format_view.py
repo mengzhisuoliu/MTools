@@ -19,6 +19,7 @@ from constants import (
 )
 from services import AudioService, ConfigService, FFmpegService
 from utils import format_file_size, logger, get_unique_path
+from utils.file_utils import pick_files, get_directory_path
 
 
 class AudioFormatView(ft.Container):
@@ -406,7 +407,8 @@ class AudioFormatView(ft.Container):
         Args:
             e: 控件事件对象
         """
-        result = await ft.FilePicker().pick_files(
+        result = await pick_files(
+            self._page,
             dialog_title="选择音频文件",
             allowed_extensions=["mp3", "wav", "aac", "m4a", "flac", "ogg", "wma", "opus", "ape", "alac"],
             allow_multiple=True,
@@ -426,7 +428,7 @@ class AudioFormatView(ft.Container):
         Args:
             e: 控件事件对象
         """
-        folder_path = await ft.FilePicker().get_directory_path(dialog_title="选择包含音频的文件夹")
+        folder_path = await get_directory_path(self._page, dialog_title="选择包含音频的文件夹")
         if folder_path:
             folder = Path(folder_path)
             audio_extensions = {".mp3", ".wav", ".aac", ".m4a", ".flac", ".ogg", ".wma", ".opus", ".ape", ".alac"}
@@ -594,7 +596,7 @@ class AudioFormatView(ft.Container):
         Args:
             e: 控件事件对象
         """
-        folder_path = await ft.FilePicker().get_directory_path(dialog_title="选择输出目录")
+        folder_path = await get_directory_path(self._page, dialog_title="选择输出目录")
         if folder_path:
             self.custom_output_dir.value = folder_path
             self.custom_output_dir.update()
@@ -746,7 +748,7 @@ class AudioFormatView(ft.Container):
             bgcolor=color,
             duration=3000,
         )
-        self._page.open(snackbar)
+        self._page.show_dialog(snackbar)
     
     def add_files(self, files: list) -> None:
         """从拖放添加文件。"""

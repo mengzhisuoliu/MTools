@@ -511,7 +511,7 @@ class WindowsUpdateView(ft.Container):
             bgcolor=color,
             duration=3000,
         )
-        self._page.open(snackbar)
+        self._page.show_dialog(snackbar)
     
     def cleanup(self) -> None:
         """清理视图资源，释放内存。"""

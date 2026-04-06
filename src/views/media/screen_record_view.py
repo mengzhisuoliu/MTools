@@ -27,6 +27,7 @@ from constants import (
 from services import ConfigService, FFmpegService
 from utils.logger import logger
 from utils import get_unique_path
+from utils.file_utils import get_directory_path
 from views.media.ffmpeg_install_view import FFmpegInstallView
 
 
@@ -1353,7 +1354,7 @@ class ScreenRecordView(ft.Container):
     
     async def _on_select_folder(self, e) -> None:
         """选择输出文件夹。"""
-        result = await ft.FilePicker().get_directory_path(dialog_title="选择保存位置")
+        result = await get_directory_path(self._page, dialog_title="选择保存位置")
         if result:
             self.output_path_field.value = result
             self._page.update()
@@ -1931,7 +1932,7 @@ class ScreenRecordView(ft.Container):
             bgcolor=color,
             duration=3000,
         )
-        self._page.open(snackbar)
+        self._page.show_dialog(snackbar)
     
     def cleanup(self) -> None:
         """清理视图资源，释放内存。"""

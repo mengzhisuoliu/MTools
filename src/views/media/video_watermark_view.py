@@ -18,6 +18,7 @@ from constants import (
 )
 from services import ConfigService, FFmpegService
 from utils import logger, get_unique_path
+from utils.file_utils import pick_files, get_directory_path
 
 class VideoWatermarkView(ft.Container):
     
@@ -600,7 +601,8 @@ class VideoWatermarkView(ft.Container):
     
     async def _on_select_font_file(self) -> None:
         """选择字体文件按钮点击事件。"""
-        files = await ft.FilePicker().pick_files(
+        files = await pick_files(
+            self._page,
             dialog_title="选择字体文件",
             allowed_extensions=["ttf", "ttc", "otf", "TTF", "TTC", "OTF"],
             allow_multiple=False,
@@ -704,7 +706,8 @@ class VideoWatermarkView(ft.Container):
     
     async def _on_select_watermark_image(self) -> None:
         """选择水印图片按钮点击事件。"""
-        files = await ft.FilePicker().pick_files(
+        files = await pick_files(
+            self._page,
             dialog_title="选择水印图片",
             allowed_extensions=["png", "jpg", "jpeg", "gif", "PNG", "JPG", "JPEG", "GIF"],
             allow_multiple=False,
@@ -716,7 +719,8 @@ class VideoWatermarkView(ft.Container):
     
     async def _on_select_files(self) -> None:
         """选择文件按钮点击事件。"""
-        files = await ft.FilePicker().pick_files(
+        files = await pick_files(
+            self._page,
             dialog_title="选择视频",
             allowed_extensions=["mp4", "avi", "mkv", "mov", "wmv", "flv", "MP4", "AVI", "MKV", "MOV", "WMV", "FLV"],
             allow_multiple=True,
@@ -730,7 +734,7 @@ class VideoWatermarkView(ft.Container):
     
     async def _on_select_folder(self) -> None:
         """选择文件夹按钮点击事件。"""
-        folder_path = await ft.FilePicker().get_directory_path(dialog_title="选择视频文件夹")
+        folder_path = await get_directory_path(self._page, dialog_title="选择视频文件夹")
         if folder_path:
             folder = Path(folder_path)
             extensions = [".mp4", ".avi", ".mkv", ".mov", ".wmv", ".flv"]
@@ -753,7 +757,7 @@ class VideoWatermarkView(ft.Container):
     
     async def _on_browse_output(self) -> None:
         """浏览输出目录按钮点击事件。"""
-        folder_path = await ft.FilePicker().get_directory_path(dialog_title="选择输出目录")
+        folder_path = await get_directory_path(self._page, dialog_title="选择输出目录")
         if folder_path:
             self.custom_output_dir.value = folder_path
             self.custom_output_dir.update()
@@ -1272,7 +1276,7 @@ class VideoWatermarkView(ft.Container):
             bgcolor=color,
             duration=2000,
         )
-        self._page.open(snackbar)
+        self._page.show_dialog(snackbar)
     
     def add_files(self, files: list) -> None:
         """从拖放添加文件。"""

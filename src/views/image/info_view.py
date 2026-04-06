@@ -19,6 +19,7 @@ from constants import (
 )
 from services import ConfigService, ImageService
 from utils import format_file_size
+from utils.file_utils import pick_files, save_file
 
 
 class ImageInfoView(ft.Container):
@@ -271,7 +272,7 @@ class ImageInfoView(ft.Container):
         Args:
             e: 控件事件对象
         """
-        result = await ft.FilePicker().pick_files(
+        result = await pick_files(self._page,
             dialog_title="选择图片文件",
             allowed_extensions=["jpg", "jpeg", "jfif", "png", "webp", "bmp", "gif", "tiff", "tif", "ico", "heic", "heif", "avif"],
             allow_multiple=False,
@@ -1239,7 +1240,7 @@ class ImageInfoView(ft.Container):
         default_filename = self.selected_file.stem + "_video" + default_ext
         
         # 打开文件保存对话框
-        result = await ft.FilePicker().save_file(
+        result = await save_file(self._page,
             dialog_title="保存视频文件",
             file_name=default_filename,
             allowed_extensions=["mp4", "mov", "MP4", "MOV"],
@@ -1253,7 +1254,7 @@ class ImageInfoView(ft.Container):
                 title=ft.Text("正在导出视频..."),
                 content=ft.ProgressRing(),
             )
-            self._page.open(progress_dialog)
+            self._page.show_dialog(progress_dialog)
             
             try:
                 # 提取视频
@@ -1263,7 +1264,7 @@ class ImageInfoView(ft.Container):
                 )
                 
                 # 关闭进度对话框
-                self._page.close(progress_dialog)
+                self._page.pop_dialog()
                 
                 if success:
                     self._show_message(message, ft.Colors.GREEN)
@@ -1285,10 +1286,10 @@ class ImageInfoView(ft.Container):
                         except Exception:
                             pass
                         
-                        self._page.close(confirm_dialog)
+                        self._page.pop_dialog()
                     
                     def close_dialog(e):
-                        self._page.close(confirm_dialog)
+                        self._page.pop_dialog()
                     
                     confirm_dialog = ft.AlertDialog(
                         title=ft.Text("导出成功"),
@@ -1298,14 +1299,14 @@ class ImageInfoView(ft.Container):
                             ft.TextButton("关闭", on_click=close_dialog),
                         ],
                     )
-                    self._page.open(confirm_dialog)
+                    self._page.show_dialog(confirm_dialog)
                 else:
                     self._show_message(message, ft.Colors.RED)
             
             except Exception as ex:
                 # 确保关闭进度对话框
                 try:
-                    self._page.close(progress_dialog)
+                    self._page.pop_dialog()
                 except Exception:
                     pass
                 self._show_message(f"导出失败: {str(ex)}", ft.Colors.RED)
@@ -1331,7 +1332,7 @@ class ImageInfoView(ft.Container):
             bgcolor=color,
             duration=2000,
         )
-        self._page.open(snackbar)
+        self._page.show_dialog(snackbar)
     
     def add_files(self, files: list) -> None:
         """从拖放添加文件（只取第一个支持的文件）。"""
@@ -1360,7 +1361,7 @@ class ImageInfoView(ft.Container):
             bgcolor=color,
             duration=2000,
         )
-        self._page.open(snackbar)
+        self._page.show_dialog(snackbar)
     
     def cleanup(self) -> None:
         """清理视图资源，释放内存。"""

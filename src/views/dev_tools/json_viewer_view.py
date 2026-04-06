@@ -420,7 +420,7 @@ class JsonTreeNode(ft.Container):
     def toggle_expand(self, e):
         """切换展开/收起状态。"""
         self.expanded = not self.expanded
-        self.icon_ref.current.name = (
+        self.icon_ref.current.icon = (
             ft.Icons.KEYBOARD_ARROW_DOWN if self.expanded 
             else ft.Icons.KEYBOARD_ARROW_RIGHT
         )
@@ -530,7 +530,7 @@ class JsonTreeNode(ft.Container):
                                     controls=[
                                         ft.Icon(
                                             ref=self.icon_ref,
-                                            name=ft.Icons.KEYBOARD_ARROW_RIGHT,  # 默认收起状态
+                                            icon=ft.Icons.KEYBOARD_ARROW_RIGHT,  # 默认收起状态
                                             size=16,
                                             color=ft.Colors.GREY_400,
                                         ),
@@ -577,7 +577,7 @@ class JsonTreeNode(ft.Container):
                                     controls=[
                                         ft.Icon(
                                             ref=self.icon_ref,
-                                            name=ft.Icons.KEYBOARD_ARROW_RIGHT,  # 默认收起状态
+                                            icon=ft.Icons.KEYBOARD_ARROW_RIGHT,  # 默认收起状态
                                             size=16,
                                             color=ft.Colors.GREY_400,
                                         ),
@@ -693,13 +693,13 @@ class JsonTreeNode(ft.Container):
             # 关闭可能存在的旧对话框
             if hasattr(page, 'dialog') and page.dialog:
                 try:
-                    page.close(page.dialog)
+                    page.pop_dialog()
                 except Exception:
                     pass
             
             # 创建小型弹出菜单
             def close_menu():
-                page.close(dialog)
+                page.pop_dialog()
             
             def copy_and_close(text):
                 self._copy_to_clipboard(page, text)
@@ -755,7 +755,7 @@ class JsonTreeNode(ft.Container):
                 ),
             )
             
-            page.open(dialog)
+            page.show_dialog(dialog)
         except Exception as ex:
             logger.error(f"右键菜单错误: {ex}")
             import traceback
@@ -772,7 +772,7 @@ class JsonTreeNode(ft.Container):
             snackbar = ft.SnackBar(
                 content=ft.Text(f"已复制: {text[:50]}..." if len(str(text)) > 50 else str(text))
             )
-            page.open(snackbar)
+            page.show_dialog(snackbar)
         except Exception as ex:
             logger.error(f"复制失败: {ex}")
 
@@ -795,7 +795,7 @@ class JsonTreeNode(ft.Container):
             if page is None:
                 return
             if hasattr(page, 'dialog') and page.dialog is not None:
-                page.close(page.dialog)
+                page.pop_dialog()
         except Exception as ex:
             logger.error(f"关闭对话框失败: {ex}")
 
@@ -904,8 +904,8 @@ class JsonViewerView(ft.Container):
             return
         
         # 计算拖动产生的比例变化
-        # e.delta_x 是像素变化
-        delta_ratio = e.delta_x / container_width
+        # e.local_delta.x 是像素变化
+        delta_ratio = e.local_delta.x / container_width
         
         # 更新比例
         self.ratio += delta_ratio
@@ -1567,7 +1567,7 @@ class JsonViewerView(ft.Container):
                     
                     control.expanded = should_expand_this_level
                     if hasattr(control, 'icon_ref') and control.icon_ref.current:
-                        control.icon_ref.current.name = (
+                        control.icon_ref.current.icon = (
                             ft.Icons.KEYBOARD_ARROW_DOWN if should_expand_this_level 
                             else ft.Icons.KEYBOARD_ARROW_RIGHT
                         )
@@ -1685,7 +1685,7 @@ class JsonViewerView(ft.Container):
                 if auto_expand and isinstance(value, (dict, list)):
                     node.expanded = True
                     if node.icon_ref.current:
-                        node.icon_ref.current.name = ft.Icons.KEYBOARD_ARROW_DOWN
+                        node.icon_ref.current.icon = ft.Icons.KEYBOARD_ARROW_DOWN
                     if node.content_ref.current:
                         node.content_ref.current.visible = True
                     node._create_children()
@@ -1698,7 +1698,7 @@ class JsonViewerView(ft.Container):
                 if auto_expand and isinstance(item, (dict, list)):
                     node.expanded = True
                     if node.icon_ref.current:
-                        node.icon_ref.current.name = ft.Icons.KEYBOARD_ARROW_DOWN
+                        node.icon_ref.current.icon = ft.Icons.KEYBOARD_ARROW_DOWN
                     if node.content_ref.current:
                         node.content_ref.current.visible = True
                     node._create_children()
@@ -1765,7 +1765,7 @@ class JsonViewerView(ft.Container):
             content=ft.Text(message),
             duration=3000,
         )
-        self._page.open(snackbar)
+        self._page.show_dialog(snackbar)
     
     def cleanup(self) -> None:
         """清理视图资源，释放内存。"""

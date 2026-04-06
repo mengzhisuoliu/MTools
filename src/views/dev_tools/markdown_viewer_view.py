@@ -11,6 +11,7 @@ from typing import Callable, Optional, Dict, List
 import flet as ft
 
 from constants import PADDING_MEDIUM, PADDING_SMALL
+from utils.file_utils import pick_files, get_directory_path, save_file
 
 
 class MarkdownViewerView(ft.Container):
@@ -176,7 +177,7 @@ class MarkdownViewerView(ft.Container):
         if container_width <= 0:
             return
         
-        delta_ratio = e.delta_x / container_width
+        delta_ratio = e.local_delta.x / container_width
         self.ratio += delta_ratio
         self.ratio = max(0.2, min(0.8, self.ratio))
         
@@ -869,7 +870,8 @@ class MarkdownViewerView(ft.Container):
     
     async def _open_workspace(self, e):
         """打开工作区文件夹选择器。"""
-        result = await ft.FilePicker().get_directory_path(
+        result = await get_directory_path(
+            self._page,
             dialog_title="选择工作区文件夹",
         )
         
@@ -1237,7 +1239,7 @@ class MarkdownViewerView(ft.Container):
         display_name = self._get_tab_display_name(file_path)
         
         def save_and_close(_):
-            self._page.close(dialog)
+            self._page.pop_dialog()
             if is_untitled:
                 # 未命名文件需要先选择保存位置
                 self._save_untitled_and_close(file_path)
@@ -1253,13 +1255,13 @@ class MarkdownViewerView(ft.Container):
                     self._show_snack(f"保存失败: {e}", error=True)
         
         def discard_and_close(_):
-            self._page.close(dialog)
+            self._page.pop_dialog()
             # 强制关闭
             self._open_tabs[file_path]["modified"] = False
             self._close_tab(file_path)
         
         def cancel(_):
-            self._page.close(dialog)
+            self._page.pop_dialog()
         
         dialog = ft.AlertDialog(
             modal=True,
@@ -1271,7 +1273,7 @@ class MarkdownViewerView(ft.Container):
                 ft.TextButton("取消", on_click=cancel),
             ],
         )
-        self._page.open(dialog)
+        self._page.show_dialog(dialog)
     
     def _save_untitled_and_close(self, untitled_key):
         """保存未命名文件并关闭标签页。"""
@@ -1411,19 +1413,19 @@ class MarkdownViewerView(ft.Container):
     def _show_save_dialog(self, next_file: Optional[Path] = None):
         """显示保存确认对话框。"""
         def save_and_continue(_):
-            self._page.close(dialog)
+            self._page.pop_dialog()
             self._save_current_file(None)
             if next_file:
                 self._load_file(next_file)
         
         def discard_and_continue(_):
-            self._page.close(dialog)
+            self._page.pop_dialog()
             self._file_modified = False
             if next_file:
                 self._load_file(next_file)
         
         def cancel(_):
-            self._page.close(dialog)
+            self._page.pop_dialog()
         
         dialog = ft.AlertDialog(
             modal=True,
@@ -1435,7 +1437,7 @@ class MarkdownViewerView(ft.Container):
                 ft.TextButton("取消", on_click=cancel),
             ],
         )
-        self._page.open(dialog)
+        self._page.show_dialog(dialog)
     
     def _save_current_file(self, e):
         """保存当前文件。"""
@@ -1475,10 +1477,10 @@ class MarkdownViewerView(ft.Container):
             self._show_save_in_workspace_dialog(untitled_key, close_after_save)
         else:
             # 没有工作区，使用系统文件保存对话框
-            result = await ft.FilePicker().save_file(
+            result = await save_file(
+                self._page,
                 dialog_title="保存 Markdown 文件",
                 file_name=default_name,
-                file_type=ft.FilePickerFileType.CUSTOM,
                 allowed_extensions=["md", "markdown"],
             )
             
@@ -1558,7 +1560,7 @@ class MarkdownViewerView(ft.Container):
             
             try:
                 new_file_path.write_text(content, encoding='utf-8')
-                self._page.close(save_dialog)
+                self._page.pop_dialog()
                 
                 # 移除未命名标签页
                 del self._open_tabs[untitled_key]
@@ -1590,15 +1592,15 @@ class MarkdownViewerView(ft.Container):
                 self._show_snack(f"保存失败: {ex}", error=True)
         
         def do_cancel(_):
-            self._page.close(save_dialog)
+            self._page.pop_dialog()
         
         async def use_system_dialog(_):
-            self._page.close(save_dialog)
+            self._page.pop_dialog()
             # 使用系统文件保存对话框
-            result = await ft.FilePicker().save_file(
+            result = await save_file(
+                self._page,
                 dialog_title="保存 Markdown 文件",
                 file_name=default_name,
-                file_type=ft.FilePickerFileType.CUSTOM,
                 allowed_extensions=["md", "markdown"],
             )
             
@@ -1679,21 +1681,21 @@ class MarkdownViewerView(ft.Container):
                 ft.Button("保存", on_click=do_save),
             ],
         )
-        self._page.open(save_dialog)
+        self._page.show_dialog(save_dialog)
     
     async def _open_file_dialog(self, e):
         """打开文件选择对话框。"""
-        result = await ft.FilePicker().pick_files(
+        result = await pick_files(
+            self._page,
             dialog_title="打开 Markdown 文件",
-            file_type=ft.FilePickerFileType.CUSTOM,
             allowed_extensions=["md", "markdown", "mdown", "mkd"],
             allow_multiple=False,
         )
         
-        if not result or not result.files:
+        if not result:
             return
         
-        file_path = Path(result.files[0].path)
+        file_path = Path(result[0].path)
         
         # 如果文件已经在标签页中打开，直接切换
         if file_path in self._open_tabs:
@@ -1744,7 +1746,7 @@ class MarkdownViewerView(ft.Container):
                 default_content = f"# {new_file_path.stem}\n\n"
                 new_file_path.write_text(default_content, encoding='utf-8')
                 
-                self._page.close(dialog)
+                self._page.pop_dialog()
                 
                 # 刷新文件列表
                 self._scan_md_files()
@@ -1758,7 +1760,7 @@ class MarkdownViewerView(ft.Container):
                 self._show_snack(f"创建文件失败: {ex}", error=True)
         
         def cancel(_):
-            self._page.close(dialog)
+            self._page.pop_dialog()
         
         dialog = ft.AlertDialog(
             modal=True,
@@ -1790,16 +1792,16 @@ class MarkdownViewerView(ft.Container):
                 ft.Button("创建", on_click=create_file),
             ],
         )
-        self._page.open(dialog)
+        self._page.show_dialog(dialog)
     
     def _confirm_delete_file(self, file_path: Path):
         """确认删除文件对话框。"""
         def delete_file(_):
-            self._page.close(dialog)
+            self._page.pop_dialog()
             self._delete_file(file_path)
         
         def cancel(_):
-            self._page.close(dialog)
+            self._page.pop_dialog()
         
         dialog = ft.AlertDialog(
             modal=True,
@@ -1847,7 +1849,7 @@ class MarkdownViewerView(ft.Container):
                 ),
             ],
         )
-        self._page.open(dialog)
+        self._page.show_dialog(dialog)
     
     def _delete_file(self, file_path: Path):
         """删除指定的文件。"""
@@ -1902,7 +1904,7 @@ class MarkdownViewerView(ft.Container):
         """显示标题级别选择菜单。"""
         def insert_heading(level):
             def handler(_):
-                self._page.close(menu_dialog)
+                self._page.pop_dialog()
                 self._insert_text("#" * level + " ")
             return handler
         
@@ -1955,10 +1957,10 @@ class MarkdownViewerView(ft.Container):
                 width=280,
             ),
             actions=[
-                ft.TextButton("取消", on_click=lambda _: self._page.close(menu_dialog)),
+                ft.TextButton("取消", on_click=lambda _: self._page.pop_dialog()),
             ],
         )
-        self._page.open(menu_dialog)
+        self._page.show_dialog(menu_dialog)
     
     def _show_code_block_menu(self, e):
         """显示代码块语言选择菜单。"""
@@ -1983,7 +1985,7 @@ class MarkdownViewerView(ft.Container):
         
         def insert_code_block(lang):
             def handler(_):
-                self._page.close(menu_dialog)
+                self._page.pop_dialog()
                 self._insert_text(f"```{lang}\n代码\n```\n")
             return handler
         
@@ -2011,10 +2013,10 @@ class MarkdownViewerView(ft.Container):
                 height=400,
             ),
             actions=[
-                ft.TextButton("取消", on_click=lambda _: self._page.close(menu_dialog)),
+                ft.TextButton("取消", on_click=lambda _: self._page.pop_dialog()),
             ],
         )
-        self._page.open(menu_dialog)
+        self._page.show_dialog(menu_dialog)
     
     def _insert_table(self):
         """插入表格模板。"""
@@ -2029,7 +2031,7 @@ class MarkdownViewerView(ft.Container):
         """显示主题选择菜单。"""
         def apply_theme(theme_key):
             def handler(_):
-                self._page.close(menu_dialog)
+                self._page.pop_dialog()
                 self._apply_theme(theme_key)
             return handler
         
@@ -2083,10 +2085,10 @@ class MarkdownViewerView(ft.Container):
                 height=400,
             ),
             actions=[
-                ft.TextButton("取消", on_click=lambda _: self._page.close(menu_dialog)),
+                ft.TextButton("取消", on_click=lambda _: self._page.pop_dialog()),
             ],
         )
-        self._page.open(menu_dialog)
+        self._page.show_dialog(menu_dialog)
     
     def _apply_theme(self, theme_key: str):
         """应用指定的主题到预览区。"""
@@ -2359,11 +2361,11 @@ print("Hello")
                 height=450,
             ),
             actions=[
-                ft.TextButton("关闭", on_click=lambda _: self._page.close(dialog)),
+                ft.TextButton("关闭", on_click=lambda _: self._page.pop_dialog()),
             ],
         )
         
-        self._page.open(dialog)
+        self._page.show_dialog(dialog)
     
     def _show_snack(self, message: str, error: bool = False):
         """显示提示消息。"""
@@ -2371,7 +2373,7 @@ print("Hello")
             content=ft.Text(message),
             bgcolor=ft.Colors.RED_400 if error else ft.Colors.GREEN_400,
         )
-        self._page.open(snackbar)
+        self._page.show_dialog(snackbar)
     
     def add_files(self, files: list) -> None:
         """从拖放添加文件，加载第一个 Markdown 文件内容。

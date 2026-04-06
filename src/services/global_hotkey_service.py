@@ -1051,7 +1051,7 @@ class GlobalHotkeyService:
                     try:
                         import flet as ft
                         snack = ft.SnackBar(content=ft.Text(message), duration=3000)
-                        self._page.open(snack)
+                        self._page.show_dialog(snack)
                     except Exception as e:
                         logger.debug(f"显示通知失败: {e}")
                 

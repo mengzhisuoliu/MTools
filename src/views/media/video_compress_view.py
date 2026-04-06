@@ -20,6 +20,7 @@ from constants import (
 )
 from services import ConfigService, FFmpegService
 from utils import format_file_size, get_unique_path
+from utils.file_utils import pick_files, get_directory_path
 from views.media.ffmpeg_install_view import FFmpegInstallView
 
 
@@ -770,7 +771,8 @@ class VideoCompressView(ft.Container):
         )
 
     async def _on_select_files(self, e: ft.ControlEvent) -> None:
-        result = await ft.FilePicker().pick_files(
+        result = await pick_files(
+            self._page,
             dialog_title="选择视频文件",
             allowed_extensions=[
                 "mp4", "mkv", "mov", "avi", "wmv", "flv", "webm", 
@@ -786,7 +788,7 @@ class VideoCompressView(ft.Container):
             self._update_file_list()
 
     async def _on_select_folder(self, e: ft.ControlEvent) -> None:
-        result = await ft.FilePicker().get_directory_path(dialog_title="选择视频文件夹")
+        result = await get_directory_path(self._page, dialog_title="选择视频文件夹")
         if result:
             folder = Path(result)
             extensions = [
@@ -901,7 +903,7 @@ class VideoCompressView(ft.Container):
         self._page.update()
 
     async def _on_browse_output(self, e: ft.ControlEvent) -> None:
-        result = await ft.FilePicker().get_directory_path(dialog_title="选择输出目录")
+        result = await get_directory_path(self._page, dialog_title="选择输出目录")
         if result:
             self.custom_output_dir.value = result
             self._page.update()
@@ -1054,7 +1056,7 @@ class VideoCompressView(ft.Container):
             bgcolor=color,
             duration=2000,
         )
-        self._page.open(snackbar)
+        self._page.show_dialog(snackbar)
     
     def add_files(self, files: list) -> None:
         """从拖放添加文件。"""

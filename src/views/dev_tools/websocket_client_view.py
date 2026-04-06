@@ -101,7 +101,7 @@ class WebSocketClientView(ft.Container):
         if container_width <= 0:
             return
         
-        delta_ratio = e.delta_x / container_width
+        delta_ratio = e.local_delta.x / container_width
         self.ratio += delta_ratio
         self.ratio = max(0.2, min(0.8, self.ratio))
         
@@ -902,11 +902,11 @@ class WebSocketClientView(ft.Container):
                 height=450,
             ),
             actions=[
-                ft.TextButton("关闭", on_click=lambda _: self._page.close(dialog)),
+                ft.TextButton("关闭", on_click=lambda _: self._page.pop_dialog()),
             ],
         )
         
-        self._page.open(dialog)
+        self._page.show_dialog(dialog)
     
     async def _copy_to_clipboard(self, text: str):
         """复制文本到剪贴板。"""
@@ -918,7 +918,7 @@ class WebSocketClientView(ft.Container):
             content=ft.Text(message),
             bgcolor=ft.Colors.RED_400 if error else ft.Colors.GREEN_400,
         )
-        self._page.open(snackbar)
+        self._page.show_dialog(snackbar)
     
     def cleanup(self) -> None:
         """清理视图资源，释放内存。"""

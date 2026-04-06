@@ -23,6 +23,7 @@ from constants import (
     PADDING_XLARGE,
 )
 from services import ConfigService, ImageService
+from utils.file_utils import pick_files, save_file
 
 
 class QRCodeGeneratorView(ft.Container):
@@ -418,7 +419,8 @@ class QRCodeGeneratorView(ft.Container):
     
     async def _on_select_image(self, e: ft.ControlEvent) -> None:
         """选择背景图片。"""
-        result = await ft.FilePicker().pick_files(
+        result = await pick_files(
+            self._page,
             dialog_title="选择背景图片",
             allowed_extensions=["jpg", "jpeg", "png", "bmp", "gif"],
             allow_multiple=False,
@@ -744,13 +746,15 @@ class QRCodeGeneratorView(ft.Container):
         
         # 根据原文件类型确定保存格式
         if self.qr_image_path.suffix.lower() == '.gif':
-            save_path = await ft.FilePicker().save_file(
+            save_path = await save_file(
+                self._page,
                 dialog_title="保存二维码",
                 file_name="qrcode.gif",
                 allowed_extensions=["gif"],
             )
         else:
-            save_path = await ft.FilePicker().save_file(
+            save_path = await save_file(
+                self._page,
                 dialog_title="保存二维码",
                 file_name="qrcode.png",
                 allowed_extensions=["png", "jpg", "jpeg"],
@@ -781,7 +785,7 @@ class QRCodeGeneratorView(ft.Container):
             bgcolor=color,
             duration=2000,
         )
-        self._page.open(snackbar)
+        self._page.show_dialog(snackbar)
     
     def cleanup(self) -> None:
         """清理视图资源，释放内存。"""

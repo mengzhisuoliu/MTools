@@ -26,6 +26,7 @@ from constants import (
 )
 from services import IDPhotoService, IDPhotoParams, IDPhotoResult
 from utils import logger, format_file_size, get_unique_path
+from utils.file_utils import pick_files, get_directory_path
 
 if TYPE_CHECKING:
     from services.config_service import ConfigService
@@ -566,7 +567,8 @@ class IDPhotoView(ft.Container):
     
     async def _on_select_files(self, e: ft.ControlEvent) -> None:
         """选择文件。"""
-        result = await ft.FilePicker().pick_files(
+        result = await pick_files(
+            self._page,
             dialog_title="选择人像照片",
             allowed_extensions=["jpg", "jpeg", "png", "webp", "bmp", "tiff", "tif", "heic", "heif"],
             allow_multiple=True,
@@ -581,7 +583,7 @@ class IDPhotoView(ft.Container):
     
     async def _on_select_folder(self, e: ft.ControlEvent) -> None:
         """选择文件夹。"""
-        folder_path = await ft.FilePicker().get_directory_path(dialog_title="选择包含照片的文件夹")
+        folder_path = await get_directory_path(self._page, dialog_title="选择包含照片的文件夹")
         if folder_path:
             folder = Path(folder_path)
             for ext in ["jpg", "jpeg", "png", "webp", "bmp", "tiff", "tif", "heic", "heif"]:
@@ -734,7 +736,7 @@ class IDPhotoView(ft.Container):
         
         # 创建预览对话框
         def close_dialog(e):
-            self._page.close(dialog)
+            self._page.pop_dialog()
         
         # 保存临时预览图
         if self.config_service:
@@ -805,7 +807,7 @@ class IDPhotoView(ft.Container):
             actions_alignment=ft.MainAxisAlignment.END,
         )
         
-        self._page.open(dialog)
+        self._page.show_dialog(dialog)
     
     # ==================== 模型管理 ====================
     
@@ -1085,10 +1087,10 @@ class IDPhotoView(ft.Container):
             model_name = model_info.display_name
         
         def close_dialog(e):
-            self._page.close(dialog)
+            self._page.pop_dialog()
         
         def confirm_delete(e):
-            self._page.close(dialog)
+            self._page.pop_dialog()
             self._do_delete_model(model_type)
         
         dialog = ft.AlertDialog(
@@ -1102,7 +1104,7 @@ class IDPhotoView(ft.Container):
             actions_alignment=ft.MainAxisAlignment.END,
         )
         
-        self._page.open(dialog)
+        self._page.show_dialog(dialog)
     
     def _do_delete_model(self, model_type: str) -> None:
         """执行删除模型。"""
@@ -1166,7 +1168,7 @@ class IDPhotoView(ft.Container):
     
     async def _on_browse_output(self, e: ft.ControlEvent) -> None:
         """浏览输出目录。"""
-        folder_path = await ft.FilePicker().get_directory_path(dialog_title="选择输出目录")
+        folder_path = await get_directory_path(self._page, dialog_title="选择输出目录")
         if folder_path:
             self.custom_output_dir.value = folder_path
             self.custom_output_dir.update()
@@ -1404,7 +1406,7 @@ class IDPhotoView(ft.Container):
     def _show_snackbar(self, message: str, color: str = None) -> None:
         """显示提示消息。"""
         snackbar = ft.SnackBar(content=ft.Text(message), bgcolor=color, duration=3000)
-        self._page.open(snackbar)
+        self._page.show_dialog(snackbar)
     
     def add_files(self, files: list) -> None:
         """从拖放添加文件。"""
@@ -1433,7 +1435,7 @@ class IDPhotoView(ft.Container):
             self._update_file_list()
             self._update_generate_button()
             snackbar = ft.SnackBar(content=ft.Text(f"已添加 {added_count} 个文件"), bgcolor=ft.Colors.GREEN)
-            self._page.open(snackbar)
+            self._page.show_dialog(snackbar)
         self._page.update()
     
     def _process_pending_files(self) -> None:
@@ -1464,7 +1466,7 @@ class IDPhotoView(ft.Container):
             self._update_file_list()
             self._update_generate_button()
             snackbar = ft.SnackBar(content=ft.Text(f"已添加 {added_count} 个文件"), bgcolor=ft.Colors.GREEN)
-            self._page.open(snackbar)
+            self._page.show_dialog(snackbar)
         try:
             self._page.update()
         except Exception:

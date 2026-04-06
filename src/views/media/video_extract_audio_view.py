@@ -20,6 +20,7 @@ from constants import (
 )
 from services import ConfigService, FFmpegService
 from utils import format_file_size, logger, get_unique_path
+from utils.file_utils import pick_files, get_directory_path
 from views.media.ffmpeg_install_view import FFmpegInstallView
 
 
@@ -419,9 +420,10 @@ class VideoExtractAudioView(ft.Container):
     
     async def _on_select_files(self) -> None:
         """选择文件。"""
-        files = await ft.FilePicker().pick_files(
-            allowed_extensions=["mp4", "avi", "mkv", "mov", "flv", "wmv", "webm", "m4v", "mpg", "mpeg", "ts", "mts", "m2ts"],
+        files = await pick_files(
+            self._page,
             dialog_title="选择视频文件",
+            allowed_extensions=["mp4", "avi", "mkv", "mov", "flv", "wmv", "webm", "m4v", "mpg", "mpeg", "ts", "mts", "m2ts"],
             allow_multiple=True,
         )
         if files:
@@ -433,8 +435,8 @@ class VideoExtractAudioView(ft.Container):
     
     async def _on_select_folder(self) -> None:
         """选择文件夹。"""
-        folder_path = await ft.FilePicker().get_directory_path(
-            dialog_title="选择视频文件夹"
+        folder_path = await get_directory_path(
+            self._page, dialog_title="选择视频文件夹"
         )
         if folder_path:
             video_extensions = {".mp4", ".avi", ".mkv", ".mov", ".flv", ".wmv", ".webm", ".m4v", ".mpg", ".mpeg", ".ts", ".mts", ".m2ts"}
@@ -595,8 +597,8 @@ class VideoExtractAudioView(ft.Container):
     
     async def _select_output_dir(self) -> None:
         """选择输出目录。"""
-        folder_path = await ft.FilePicker().get_directory_path(
-            dialog_title="选择输出目录"
+        folder_path = await get_directory_path(
+            self._page, dialog_title="选择输出目录"
         )
         if folder_path:
             self.output_dir_field.value = folder_path
@@ -848,7 +850,7 @@ class VideoExtractAudioView(ft.Container):
             bgcolor=color,
             duration=3000,
         )
-        self._page.open(snackbar)
+        self._page.show_dialog(snackbar)
     
     def _show_error(self, message: str) -> None:
         """显示错误消息。"""
@@ -857,7 +859,7 @@ class VideoExtractAudioView(ft.Container):
             bgcolor=ft.Colors.ERROR,
             duration=3000,
         )
-        self._page.open(snackbar)
+        self._page.show_dialog(snackbar)
     
     def _on_back_click(self, e: ft.ControlEvent = None) -> None:
         """返回按钮点击事件处理。"""
@@ -888,10 +890,10 @@ class VideoExtractAudioView(ft.Container):
         if added_count > 0:
             self._update_file_list()
             snackbar = ft.SnackBar(content=ft.Text(f"已添加 {added_count} 个文件"), bgcolor=ft.Colors.GREEN)
-            self._page.open(snackbar)
+            self._page.show_dialog(snackbar)
         elif skipped_count > 0:
             snackbar = ft.SnackBar(content=ft.Text("视频提取音频不支持该格式"), bgcolor=ft.Colors.ORANGE)
-            self._page.open(snackbar)
+            self._page.show_dialog(snackbar)
         self._page.update()
     
     def cleanup(self) -> None:

@@ -12,6 +12,7 @@ import flet as ft
 from constants import PADDING_MEDIUM, PADDING_SMALL
 from services import ConfigService
 from utils import logger
+from utils.file_utils import pick_files
 
 
 class HttpClientView(ft.Container):
@@ -105,7 +106,7 @@ class HttpClientView(ft.Container):
             return
         
         # 计算拖动产生的比例变化
-        delta_ratio = e.delta_x / container_width
+        delta_ratio = e.local_delta.x / container_width
         self.ratio += delta_ratio
         
         # 限制比例范围 (0.2 到 0.8)
@@ -382,7 +383,7 @@ class HttpClientView(ft.Container):
             
             field_name = name
             should_pick_file = True
-            self._page.close(dialog)
+            self._page.pop_dialog()
             
         dialog = ft.AlertDialog(
             title=ft.Text("添加文件"),
@@ -393,11 +394,11 @@ class HttpClientView(ft.Container):
                 on_submit=confirm_add,
             ),
             actions=[
-                ft.TextButton("取消", on_click=lambda _: self._page.close(dialog)),
+                ft.TextButton("取消", on_click=lambda _: self._page.pop_dialog()),
                 ft.TextButton("选择文件", on_click=confirm_add),
             ],
         )
-        self._page.open(dialog)
+        self._page.show_dialog(dialog)
         
         # 等待对话框关闭后再选择文件
         import asyncio
@@ -405,9 +406,9 @@ class HttpClientView(ft.Container):
             await asyncio.sleep(0.1)
         
         if should_pick_file and field_name:
-            result = await ft.FilePicker().pick_files(allow_multiple=False)
-            if result and result.files:
-                file_path = result.files[0].path
+            result = await pick_files(self._page, allow_multiple=False)
+            if result:
+                file_path = result[0].path
                 self.files_dict[field_name] = file_path
                 self._update_multipart_list()
     
@@ -964,11 +965,11 @@ http://user:pass@proxy.com:8080
                 height=400,
             ),
             actions=[
-                ft.TextButton("关闭", on_click=lambda _: self._page.close(dialog)),
+                ft.TextButton("关闭", on_click=lambda _: self._page.pop_dialog()),
             ],
         )
         
-        self._page.open(dialog)
+        self._page.show_dialog(dialog)
     
     def _show_snack(self, message: str, error: bool = False):
         """显示提示消息。"""
@@ -976,7 +977,7 @@ http://user:pass@proxy.com:8080
             content=ft.Text(message),
             bgcolor=ft.Colors.RED_400 if error else ft.Colors.GREEN_400,
         )
-        self._page.open(snackbar)
+        self._page.show_dialog(snackbar)
     
     def cleanup(self) -> None:
         """清理视图资源，释放内存。"""

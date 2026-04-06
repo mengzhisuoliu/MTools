@@ -26,6 +26,7 @@ from constants.model_config import ImageEnhanceModelInfo
 from services import ConfigService, FFmpegService
 from services.image_service import ImageEnhancer
 from utils import format_file_size, get_unique_path
+from utils.file_utils import pick_files, get_directory_path
 from views.media.ffmpeg_install_view import FFmpegInstallView
 
 
@@ -913,7 +914,7 @@ class VideoEnhanceView(ft.Container):
         if self.is_processing:
             # 显示确认对话框
             def confirm_exit(confirm_e: ft.ControlEvent) -> None:
-                self._page.close(dialog)
+                self._page.pop_dialog()
                 
                 # 清理资源并取消任务
                 self.cleanup()
@@ -923,7 +924,7 @@ class VideoEnhanceView(ft.Container):
                     self.on_back()
             
             def cancel_exit(cancel_e: ft.ControlEvent) -> None:
-                self._page.close(dialog)
+                self._page.pop_dialog()
             
             dialog = ft.AlertDialog(
                 modal=True,
@@ -943,7 +944,7 @@ class VideoEnhanceView(ft.Container):
                 actions_alignment=ft.MainAxisAlignment.END,
             )
             
-            self._page.open(dialog)
+            self._page.show_dialog(dialog)
         else:
             # 没有任务在运行，直接返回
             if self.on_back:
@@ -957,11 +958,11 @@ class VideoEnhanceView(ft.Container):
         
         if self.enhancer:
             def confirm_switch(confirm_e: ft.ControlEvent) -> None:
-                self._page.close(dialog)
+                self._page.pop_dialog()
                 self._switch_model(new_model_key)
             
             def cancel_switch(cancel_e: ft.ControlEvent) -> None:
-                self._page.close(dialog)
+                self._page.pop_dialog()
                 self.model_selector.value = self.current_model_key
                 self.model_selector.update()
             
@@ -976,7 +977,7 @@ class VideoEnhanceView(ft.Container):
                 actions_alignment=ft.MainAxisAlignment.END,
             )
             
-            self._page.open(dialog)
+            self._page.show_dialog(dialog)
         else:
             self._switch_model(new_model_key)
     
@@ -1061,7 +1062,7 @@ class VideoEnhanceView(ft.Container):
     def _on_unload_model(self, e: ft.ControlEvent) -> None:
         """卸载模型按钮点击事件。"""
         def confirm_unload(confirm_e: ft.ControlEvent) -> None:
-            self._page.close(dialog)
+            self._page.pop_dialog()
             
             if self.enhancer:
                 self.enhancer = None
@@ -1073,7 +1074,7 @@ class VideoEnhanceView(ft.Container):
                 self._show_snackbar("模型未加载", ft.Colors.ORANGE)
         
         def cancel_unload(cancel_e: ft.ControlEvent) -> None:
-            self._page.close(dialog)
+            self._page.pop_dialog()
         
         estimated_memory = int(self.current_model.size_mb * 1.2)
         
@@ -1091,12 +1092,12 @@ class VideoEnhanceView(ft.Container):
             actions_alignment=ft.MainAxisAlignment.END,
         )
         
-        self._page.open(dialog)
+        self._page.show_dialog(dialog)
     
     def _on_delete_model(self, e: ft.ControlEvent) -> None:
         """删除模型按钮点击事件。"""
         def confirm_delete(confirm_e: ft.ControlEvent) -> None:
-            self._page.close(dialog)
+            self._page.pop_dialog()
             
             if self.enhancer:
                 self.enhancer = None
@@ -1121,7 +1122,7 @@ class VideoEnhanceView(ft.Container):
                 self._show_snackbar(f"删除模型失败: {ex}", ft.Colors.RED)
         
         def cancel_delete(cancel_e: ft.ControlEvent) -> None:
-            self._page.close(dialog)
+            self._page.pop_dialog()
         
         dialog = ft.AlertDialog(
             modal=True,
@@ -1143,11 +1144,12 @@ class VideoEnhanceView(ft.Container):
             actions_alignment=ft.MainAxisAlignment.END,
         )
         
-        self._page.open(dialog)
+        self._page.show_dialog(dialog)
     
     async def _on_select_files(self, e: ft.ControlEvent) -> None:
         """选择文件按钮点击事件。"""
-        result = await ft.FilePicker().pick_files(
+        result = await pick_files(
+            self._page,
             dialog_title="选择视频文件",
             allowed_extensions=["mp4", "mkv", "mov", "avi", "wmv", "flv", "webm", "m4v", "3gp", "ts", "m2ts"],
             allow_multiple=True,
@@ -1163,7 +1165,7 @@ class VideoEnhanceView(ft.Container):
     
     async def _on_select_folder(self, e: ft.ControlEvent) -> None:
         """选择文件夹按钮点击事件。"""
-        result = await ft.FilePicker().get_directory_path(dialog_title="选择包含视频的文件夹")
+        result = await get_directory_path(self._page, dialog_title="选择包含视频的文件夹")
         if result:
             folder_path = Path(result)
             video_extensions = {".mp4", ".mkv", ".mov", ".avi", ".wmv", ".flv", ".webm", ".m4v", ".3gp", ".ts", ".m2ts"}
@@ -1296,7 +1298,7 @@ class VideoEnhanceView(ft.Container):
     
     async def _on_browse_output(self, e: ft.ControlEvent) -> None:
         """浏览输出目录按钮点击事件。"""
-        result = await ft.FilePicker().get_directory_path(dialog_title="选择输出目录")
+        result = await get_directory_path(self._page, dialog_title="选择输出目录")
         if result:
             self.custom_output_dir.value = result
             self.custom_output_dir.update()
@@ -2255,7 +2257,7 @@ class VideoEnhanceView(ft.Container):
                 bgcolor=color,
                 duration=3000,
             )
-            self._page.open(snackbar)
+            self._page.show_dialog(snackbar)
         except Exception as e:
             logger.debug(f"显示snackbar失败（可能视图已销毁）: {e}")
     

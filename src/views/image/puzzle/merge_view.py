@@ -23,6 +23,7 @@ from constants import (
 )
 from services import ConfigService, ImageService
 from utils import format_file_size, GifUtils
+from utils.file_utils import pick_files, save_file
 
 
 class ImagePuzzleMergeView(ft.Container):
@@ -476,7 +477,7 @@ class ImagePuzzleMergeView(ft.Container):
     
     async def _on_select_files(self, e: ft.ControlEvent) -> None:
         """选择文件按钮点击事件 - 支持实时预览。"""
-        result = await ft.FilePicker().pick_files(
+        result = await pick_files(self._page,
             dialog_title="选择图片文件",
             allowed_extensions=["jpg", "jpeg", "jfif", "png", "bmp", "webp", "tiff", "gif"],
             allow_multiple=True,
@@ -1203,7 +1204,7 @@ class ImagePuzzleMergeView(ft.Container):
             else:
                 default_filename = f"{original_stem}_merge.png"
         
-        result = await ft.FilePicker().save_file(
+        result = await save_file(self._page,
             dialog_title="保存合并结果",
             file_name=default_filename,
             allowed_extensions=allowed_extensions,
@@ -1408,7 +1409,7 @@ class ImagePuzzleMergeView(ft.Container):
             bgcolor=color,
             duration=3000,
         )
-        self._page.open(snackbar)
+        self._page.show_dialog(snackbar)
     
     def add_files(self, files: list) -> None:
         """从拖放添加文件。"""

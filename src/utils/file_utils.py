@@ -4,14 +4,19 @@
 提供文件和目录操作相关的工具函数。
 """
 
+from __future__ import annotations
+
 import os
 import platform
 import shutil
 import subprocess
 import sys
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, TYPE_CHECKING
 from utils import logger
+
+if TYPE_CHECKING:
+    import flet as ft
 
 
 def is_packaged_app() -> bool:
@@ -685,3 +690,64 @@ def get_unique_path(path: Path, add_sequence: bool = True) -> Path:
         if counter > 9999:
             logger.warning(f"文件序号超过 9999，直接覆盖: {path}")
             return path
+
+
+def _get_shared_file_picker(page: ft.Page) -> Any:
+    """获取注册在 page 上的共享 FilePicker 实例。"""
+    fp = getattr(page, "_shared_file_picker", None)
+    if fp is None:
+        import flet as ft_mod
+        fp = ft_mod.FilePicker()
+        page.services.append(fp)
+        page._shared_file_picker = fp
+    return fp
+
+
+async def pick_files(
+    page: ft.Page,
+    *,
+    dialog_title: Optional[str] = None,
+    initial_directory: Optional[str] = None,
+    allowed_extensions: Optional[list[str]] = None,
+    allow_multiple: bool = False,
+) -> list:
+    """通过共享 FilePicker 打开文件选择对话框。"""
+    fp = _get_shared_file_picker(page)
+    return await fp.pick_files(
+        dialog_title=dialog_title,
+        initial_directory=initial_directory,
+        allowed_extensions=allowed_extensions,
+        allow_multiple=allow_multiple,
+    )
+
+
+async def get_directory_path(
+    page: ft.Page,
+    *,
+    dialog_title: Optional[str] = None,
+    initial_directory: Optional[str] = None,
+) -> Optional[str]:
+    """通过共享 FilePicker 打开目录选择对话框。"""
+    fp = _get_shared_file_picker(page)
+    return await fp.get_directory_path(
+        dialog_title=dialog_title,
+        initial_directory=initial_directory,
+    )
+
+
+async def save_file(
+    page: ft.Page,
+    *,
+    dialog_title: Optional[str] = None,
+    file_name: Optional[str] = None,
+    initial_directory: Optional[str] = None,
+    allowed_extensions: Optional[list[str]] = None,
+) -> Optional[str]:
+    """通过共享 FilePicker 打开文件保存对话框。"""
+    fp = _get_shared_file_picker(page)
+    return await fp.save_file(
+        dialog_title=dialog_title,
+        file_name=file_name,
+        initial_directory=initial_directory,
+        allowed_extensions=allowed_extensions,
+    )

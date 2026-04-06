@@ -22,6 +22,7 @@ from constants import (
 from services import ConfigService
 from services.subtitle_remove_service import SubtitleRemoveService
 from utils import format_file_size, logger, get_unique_path
+from utils.file_utils import pick_files, get_directory_path
 
 
 class ImageWatermarkRemoveView(ft.Container):
@@ -506,7 +507,7 @@ class ImageWatermarkRemoveView(ft.Container):
             self.config_service.set_config_value("image_watermark_mask_color", color)
             # 更新颜色预览
             self.mask_color_btn.content.controls[0].bgcolor = color
-            self._page.close(dialog)
+            self._page.pop_dialog()
         
         # 预设颜色
         colors = [
@@ -546,15 +547,16 @@ class ImageWatermarkRemoveView(ft.Container):
             ],
         )
         
-        self._page.open(dialog)
+        self._page.show_dialog(dialog)
     
     def _close_dialog(self, dialog: ft.AlertDialog) -> None:
         """关闭对话框。"""
-        self._page.close(dialog)
+        self._page.pop_dialog()
     
     async def _on_select_files(self) -> None:
         """选择文件按钮点击事件。"""
-        result = await ft.FilePicker().pick_files(
+        result = await pick_files(
+            self._page,
             dialog_title="选择图片",
             allowed_extensions=["jpg", "jpeg", "png", "bmp", "webp", "tiff", "tif"],
             allow_multiple=True,
@@ -569,7 +571,8 @@ class ImageWatermarkRemoveView(ft.Container):
     
     async def _on_select_folder(self) -> None:
         """选择文件夹按钮点击事件。"""
-        folder_path = await ft.FilePicker().get_directory_path(
+        folder_path = await get_directory_path(
+            self._page,
             dialog_title="选择包含图片的文件夹"
         )
         if folder_path:
@@ -877,8 +880,8 @@ class ImageWatermarkRemoveView(ft.Container):
         
         def on_pan_start(e: ft.DragStartEvent):
             # 限制在有效范围内
-            x = max(0, min(display_width, e.local_x))
-            y = max(0, min(display_height, e.local_y))
+            x = max(0, min(display_width, e.local_position.x))
+            y = max(0, min(display_height, e.local_position.y))
             draw_state['start_x'] = x
             draw_state['start_y'] = y
             selection_box.left = x
@@ -890,8 +893,8 @@ class ImageWatermarkRemoveView(ft.Container):
         
         def on_pan_update(e: ft.DragUpdateEvent):
             # 限制范围
-            end_x = max(0, min(display_width, e.local_x))
-            end_y = max(0, min(display_height, e.local_y))
+            end_x = max(0, min(display_width, e.local_position.x))
+            end_y = max(0, min(display_height, e.local_position.y))
             
             # 保存当前位置
             draw_state['end_x'] = end_x
@@ -961,7 +964,7 @@ class ImageWatermarkRemoveView(ft.Container):
         )
         
         def close_dialog(e):
-            self._page.close(dialog)
+            self._page.pop_dialog()
         
         def on_confirm(e):
             if regions_list:
@@ -969,7 +972,7 @@ class ImageWatermarkRemoveView(ft.Container):
             elif str(file_path) in self.file_regions:
                 del self.file_regions[str(file_path)]
             
-            self._page.close(dialog)
+            self._page.pop_dialog()
             self._update_file_list()
             logger.info(f"已保存 {file_path.name} 的 {len(regions_list)} 个区域")
         
@@ -992,7 +995,7 @@ class ImageWatermarkRemoveView(ft.Container):
                     self.file_regions[str(other_file)] = [r.copy() for r in regions_list]
                     applied_count += 1
             
-            self._page.close(dialog)
+            self._page.pop_dialog()
             self._update_file_list()
             self._show_snackbar(f"已将区域设置应用到所有 {applied_count + 1} 个文件", ft.Colors.GREEN)
             logger.info(f"已将 {len(regions_list)} 个区域应用到 {applied_count + 1} 个文件")
@@ -1088,12 +1091,12 @@ class ImageWatermarkRemoveView(ft.Container):
             actions_alignment=ft.MainAxisAlignment.END,
         )
         
-        self._page.open(dialog)
+        self._page.show_dialog(dialog)
     
     def _show_snackbar(self, message: str, color: str = None) -> None:
         """显示 snackbar 提示。"""
         snackbar = ft.SnackBar(content=ft.Text(message), bgcolor=color)
-        self._page.open(snackbar)
+        self._page.show_dialog(snackbar)
     
     def _on_output_mode_change(self) -> None:
         """输出模式变化事件。"""
@@ -1104,7 +1107,8 @@ class ImageWatermarkRemoveView(ft.Container):
     
     async def _select_output_dir(self) -> None:
         """选择输出目录。"""
-        folder_path = await ft.FilePicker().get_directory_path(
+        folder_path = await get_directory_path(
+            self._page,
             dialog_title="选择输出目录"
         )
         if folder_path:

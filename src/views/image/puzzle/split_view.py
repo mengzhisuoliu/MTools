@@ -23,6 +23,7 @@ from constants import (
 )
 from services import ConfigService, ImageService
 from utils import format_file_size, GifUtils
+from utils.file_utils import pick_files, save_file, get_directory_path
 
 
 class ImagePuzzleSplitView(ft.Container):
@@ -707,7 +708,7 @@ class ImagePuzzleSplitView(ft.Container):
     
     async def _on_select_bg_image(self, e: ft.ControlEvent) -> None:
         """选择背景图片按钮点击事件。"""
-        result = await ft.FilePicker().pick_files(
+        result = await pick_files(self._page,
             dialog_title="选择背景图片",
             allowed_extensions=["jpg", "jpeg", "jfif", "png", "bmp", "webp", "tiff", "gif"],
             allow_multiple=False,
@@ -729,7 +730,7 @@ class ImagePuzzleSplitView(ft.Container):
     
     async def _on_select_file(self, e: ft.ControlEvent) -> None:
         """选择文件按钮点击事件。"""
-        result = await ft.FilePicker().pick_files(
+        result = await pick_files(self._page,
             dialog_title="选择图片文件",
             allowed_extensions=["jpg", "jpeg", "jfif", "png", "bmp", "webp", "tiff", "gif"],
             allow_multiple=False,
@@ -1485,7 +1486,7 @@ class ImagePuzzleSplitView(ft.Container):
             elif has_transparency:
                 allowed_extensions = ["png"]
         
-        result_path = await ft.FilePicker().save_file(
+        result_path = await save_file(self._page,
             dialog_title="保存切分结果",
             file_name=default_filename,
             allowed_extensions=allowed_extensions,
@@ -1589,7 +1590,7 @@ class ImagePuzzleSplitView(ft.Container):
             return
         
         # 选择输出目录
-        result_path = await ft.FilePicker().get_directory_path(
+        result_path = await get_directory_path(self._page,
             dialog_title="选择导出目录",
         )
         
@@ -2109,7 +2110,7 @@ class ImagePuzzleSplitView(ft.Container):
             bgcolor=color,
             duration=3000,
         )
-        self._page.open(snackbar)
+        self._page.show_dialog(snackbar)
     
     def add_files(self, files: list) -> None:
         """从拖放添加文件（只取第一个支持的文件）。"""

@@ -13,7 +13,7 @@ import sys
 import platform
 import webbrowser
 from utils import logger
-from utils.file_utils import get_system_fonts
+from utils.file_utils import get_system_fonts, pick_files, get_directory_path
 
 import flet as ft
 import httpx
@@ -105,8 +105,7 @@ class SettingsView(ft.Container):
         self._init_file_picker()
 
     def _init_file_picker(self) -> None:
-        """初始化文件选择器（Flet 1.0 不再需要预先创建）。"""
-        # Flet 1.0 使用 await ft.FilePicker().pick_files() 方式，不再需要预先创建
+        """初始化文件选择器（由 MainView 统一挂载共享实例）。"""
         pass
     
     def _safe_page_update(self) -> None:
@@ -215,27 +214,9 @@ class SettingsView(ft.Container):
         self.appearance_section_container: ft.Container = self._build_deferred_section_placeholder("外观设置加载中...")
         self.interface_section_container: ft.Container = self._build_deferred_section_placeholder("界面设置加载中...")
         self.gpu_acceleration_section_container: ft.Container = self._build_deferred_section_placeholder("GPU 加速设置加载中...")
-        self.performance_section_container: ft.Container = self._build_deferred_section_placeholder(
-            "性能优化设置将自动延迟加载",
-            with_load_button=True,
-            on_load_click=lambda _: self._load_single_deferred_section(
-                self.performance_section_container, self._build_performance_optimization_section, section_key="performance"
-            ),
-        )
-        self.font_section_container: ft.Container = self._build_deferred_section_placeholder(
-            "字体设置将自动延迟加载",
-            with_load_button=True,
-            on_load_click=lambda _: self._load_single_deferred_section(
-                self.font_section_container, self._build_font_section, section_key="font"
-            ),
-        )
-        self.about_section_container: ft.Container = self._build_deferred_section_placeholder(
-            "关于信息将自动延迟加载",
-            with_load_button=True,
-            on_load_click=lambda _: self._load_single_deferred_section(
-                self.about_section_container, self._build_about_section, section_key="about"
-            ),
-        )
+        self.performance_section_container: ft.Container = self._build_deferred_section_placeholder("性能优化设置加载中...")
+        self.font_section_container: ft.Container = self._build_deferred_section_placeholder("字体设置加载中...")
+        self.about_section_container: ft.Container = self._build_deferred_section_placeholder("关于信息加载中...")
         
         # 区块构建顺序（越靠前越先可用）
         self._deferred_section_plan = [
@@ -247,12 +228,11 @@ class SettingsView(ft.Container):
             (self.appearance_section_container, self._build_appearance_section),
             (self.interface_section_container, self._build_interface_section),
             (self.gpu_acceleration_section_container, self._build_gpu_acceleration_section),
+            (self.performance_section_container, self._build_performance_optimization_section),
+            (self.font_section_container, self._build_font_section),
+            (self.about_section_container, self._build_about_section),
         ]
-        self._optional_section_plan = [
-            ("about", self.about_section_container, self._build_about_section),
-            ("performance", self.performance_section_container, self._build_performance_optimization_section),
-            ("font", self.font_section_container, self._build_font_section),
-        ]
+        self._optional_section_plan = []
         
         # 组装视图
         self.content = ft.Column(
@@ -1472,9 +1452,9 @@ class SettingsView(ft.Container):
             )
         
         # 同时更新 FAB 的透明度
-        if hasattr(page, 'floating_action_button') and page.floating_action_button:
-            fab_opacity = 0.9 * value  # FAB 保持较高的可见度
-            page.floating_action_button.bgcolor = ft.Colors.with_opacity(
+        if hasattr(page, '_main_view_instance') and hasattr(page._main_view_instance, 'fab_search') and page._main_view_instance.fab_search:
+            fab_opacity = 0.9 * value
+            page._main_view_instance.fab_search.bgcolor = ft.Colors.with_opacity(
                 fab_opacity,
                 ft.Colors.PRIMARY
             )
@@ -1493,7 +1473,8 @@ class SettingsView(ft.Container):
     
     async def _on_pick_bg_image(self, e: ft.ControlEvent) -> None:
         """选择背景图片。"""
-        result = await ft.FilePicker().pick_files(
+        result = await pick_files(
+            self._page,
             allowed_extensions=["png", "jpg", "jpeg", "webp", "bmp"],
             dialog_title="选择背景图片"
         )
@@ -1566,9 +1547,9 @@ class SettingsView(ft.Container):
             )
         
         # 重新应用 FAB 透明度
-        if hasattr(page, 'floating_action_button') and page.floating_action_button:
+        if hasattr(page, '_main_view_instance') and hasattr(page._main_view_instance, 'fab_search') and page._main_view_instance.fab_search:
             fab_opacity = 0.9 * current_opacity
-            page.floating_action_button.bgcolor = ft.Colors.with_opacity(
+            page._main_view_instance.fab_search.bgcolor = ft.Colors.with_opacity(
                 fab_opacity,
                 ft.Colors.PRIMARY
             )
@@ -2999,7 +2980,7 @@ class SettingsView(ft.Container):
                     self._apply_custom_color(color_value)
             page = getattr(self, '_saved_page', self._page)
             if page:
-                page.close(self.color_picker_dialog)
+                page.pop_dialog()
         
         self.color_picker_dialog = ft.AlertDialog(
             modal=True,
@@ -3014,7 +2995,7 @@ class SettingsView(ft.Container):
         
         page = getattr(self, '_saved_page', self._page)
         if page:
-            page.open(self.color_picker_dialog)
+            page.show_dialog(self.color_picker_dialog)
     
     def _update_color_preview_in_dialog(
         self,
@@ -3723,7 +3704,7 @@ class SettingsView(ft.Container):
         
         page = getattr(self, '_saved_page', self._page)
         if page:
-            page.open(dialog)
+            page.show_dialog(dialog)
     
     def _start_auto_update(
         self, 
@@ -3859,7 +3840,7 @@ class SettingsView(ft.Container):
         """
         page = getattr(self, '_saved_page', self._page)
         if page:
-            page.close(dialog)
+            page.pop_dialog()
     
     def _on_auto_check_update_change(self, e: ft.ControlEvent) -> None:
         """自动检测更新开关状态变化事件。
@@ -3936,7 +3917,7 @@ class SettingsView(ft.Container):
         Args:
             e: 控件事件对象
         """
-        folder_path = await ft.FilePicker().get_directory_path(dialog_title="选择数据存储目录")
+        folder_path = await get_directory_path(self._page, dialog_title="选择数据存储目录")
         if folder_path:
             # 检查是否需要迁移数据
             old_dir = self.config_service.get_data_dir()
@@ -3982,7 +3963,7 @@ class SettingsView(ft.Container):
             """选择迁移数据"""
             page = getattr(self, '_saved_page', self._page)
             if page:
-                page.close(dialog)
+                page.pop_dialog()
             # 显示迁移进度对话框
             self._show_migrate_progress_dialog(old_dir, new_dir)
         
@@ -3990,7 +3971,7 @@ class SettingsView(ft.Container):
             """不迁移数据"""
             page = getattr(self, '_saved_page', self._page)
             if page:
-                page.close(dialog)
+                page.pop_dialog()
             # 直接更改目录
             if self.config_service.set_data_dir(str(new_dir), is_custom=True):
                 self.data_dir_text.value = str(new_dir)
@@ -4010,7 +3991,7 @@ class SettingsView(ft.Container):
         
         def on_cancel(e):
             """取消操作"""
-            self._page.close(dialog)
+            self._page.pop_dialog()
             
             # 恢复单选按钮状态（因为用户取消了操作）
             current_dir = self.config_service.get_data_dir()
@@ -4081,7 +4062,7 @@ class SettingsView(ft.Container):
         
         page = getattr(self, '_saved_page', self._page)
         if page:
-            page.open(dialog)
+            page.show_dialog(dialog)
     
     def _show_migrate_progress_dialog(self, old_dir: Path, new_dir: Path) -> None:
         """显示数据迁移进度对话框。
@@ -4112,7 +4093,7 @@ class SettingsView(ft.Container):
         
         page = getattr(self, '_saved_page', self._page)
         if page:
-            page.open(dialog)
+            page.show_dialog(dialog)
         
         # 在异步任务中执行迁移
         async def migrate_task():
@@ -4146,7 +4127,7 @@ class SettingsView(ft.Container):
             try:
                 _page = getattr(self, '_saved_page', self._page)
                 if _page:
-                    _page.close(dialog)
+                    _page.pop_dialog()
             except Exception:
                 pass
             
@@ -4187,7 +4168,7 @@ class SettingsView(ft.Container):
         """
         def on_delete(e):
             """删除旧数据"""
-            self._page.close(dialog)
+            self._page.pop_dialog()
             
             # 在异步任务中执行删除
             async def delete_task():
@@ -4228,7 +4209,7 @@ class SettingsView(ft.Container):
         
         def on_keep(e):
             """保留旧数据"""
-            self._page.close(dialog)
+            self._page.pop_dialog()
             self._show_snackbar("已保留旧数据", ft.Colors.BLUE)
         
         dialog = ft.AlertDialog(
@@ -4300,7 +4281,7 @@ class SettingsView(ft.Container):
             actions_alignment=ft.MainAxisAlignment.END,
         )
         
-        self._page.open(dialog)
+        self._page.show_dialog(dialog)
     
     def _on_open_dir_click(self, e: ft.ControlEvent) -> None:
         """打开目录按钮点击事件处理。
@@ -4532,7 +4513,7 @@ class SettingsView(ft.Container):
         )
         
         # 显示对话框
-        self._page.open(self.font_selector_dialog)
+        self._page.show_dialog(self.font_selector_dialog)
         
         # 初始加载第一页数据
         self._update_font_page()
@@ -4651,11 +4632,12 @@ class SettingsView(ft.Container):
     def _close_font_selector_dialog(self) -> None:
         """关闭字体选择对话框。"""
         if hasattr(self, 'font_selector_dialog'):
-            self._page.close(self.font_selector_dialog)
+            self._page.pop_dialog()
     
     async def _pick_font_file(self) -> None:
         """打开文件选择器选择字体文件。"""
-        result = await ft.FilePicker().pick_files(
+        result = await pick_files(
+            self._page,
             dialog_title="选择字体文件",
             allowed_extensions=["ttf", "otf", "ttc", "woff", "woff2"],
             allow_multiple=False,
@@ -4831,7 +4813,7 @@ class SettingsView(ft.Container):
                 return
             # 显示 snackbar
             try:
-                page.open(snackbar)
+                page.show_dialog(snackbar)
             except Exception:
                 # 如果 overlay 不可用或在后台线程中引发错误，则尝试安全地设置一个简单替代：
                 # 将消息打印到控制台（避免抛出未捕获异常）

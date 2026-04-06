@@ -18,6 +18,7 @@ from constants import (
 )
 from services import ConfigService, FFmpegService
 from utils import format_file_size, get_unique_path
+from utils.file_utils import pick_files, get_directory_path
 from views.media.ffmpeg_install_view import FFmpegInstallView
 
 
@@ -385,7 +386,8 @@ class VideoRepairView(ft.Container):
 
     async def _on_select_files(self) -> None:
         """选择文件事件处理。"""
-        files = await ft.FilePicker().pick_files(
+        files = await pick_files(
+            self._page,
             dialog_title="选择损坏的视频文件",
             allowed_extensions=[
                 "mp4", "mkv", "mov", "avi", "wmv", "flv", "webm", 
@@ -402,7 +404,7 @@ class VideoRepairView(ft.Container):
 
     async def _on_select_folder(self) -> None:
         """选择文件夹事件处理。"""
-        folder_path = await ft.FilePicker().get_directory_path(dialog_title="选择视频文件夹")
+        folder_path = await get_directory_path(self._page, dialog_title="选择视频文件夹")
         if folder_path:
             folder = Path(folder_path)
             extensions = [
@@ -474,7 +476,7 @@ class VideoRepairView(ft.Container):
 
     async def _on_browse_output(self) -> None:
         """浏览输出目录。"""
-        folder_path = await ft.FilePicker().get_directory_path(dialog_title="选择输出目录")
+        folder_path = await get_directory_path(self._page, dialog_title="选择输出目录")
         if folder_path:
             self.custom_output_dir.value = folder_path
             self._page.update()
@@ -599,7 +601,7 @@ class VideoRepairView(ft.Container):
             bgcolor=color,
             duration=2000,
         )
-        self._page.open(snackbar)
+        self._page.show_dialog(snackbar)
     
     def add_files(self, files: list) -> None:
         """从拖放添加文件。"""

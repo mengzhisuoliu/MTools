@@ -20,6 +20,7 @@ from constants import (
 )
 from services import ConfigService, FFmpegService
 from utils import format_file_size, logger, get_unique_path
+from utils.file_utils import pick_files, get_directory_path
 from views.media.ffmpeg_install_view import FFmpegInstallView
 
 
@@ -392,9 +393,10 @@ class AudioCompressView(ft.Container):
 
     async def _on_select_files(self, e: ft.ControlEvent) -> None:
         """选择文件。"""
-        result = await ft.FilePicker().pick_files(
-            allowed_extensions=["mp3", "wav", "aac", "flac", "ogg", "m4a", "wma", "opus"],
+        result = await pick_files(
+            self._page,
             dialog_title="选择音频文件",
+            allowed_extensions=["mp3", "wav", "aac", "flac", "ogg", "m4a", "wma", "opus"],
             allow_multiple=True,
         )
         if result:
@@ -406,7 +408,7 @@ class AudioCompressView(ft.Container):
     
     async def _on_select_folder(self, e: ft.ControlEvent) -> None:
         """选择文件夹。"""
-        folder_path = await ft.FilePicker().get_directory_path(dialog_title="选择音频文件夹")
+        folder_path = await get_directory_path(self._page, dialog_title="选择音频文件夹")
         if folder_path:
             folder = Path(folder_path)
             audio_extensions = {".mp3", ".wav", ".aac", ".flac", ".ogg", ".m4a", ".wma", ".opus"}
@@ -491,7 +493,7 @@ class AudioCompressView(ft.Container):
     
     async def _select_output_dir(self, e: ft.ControlEvent) -> None:
         """选择输出目录。"""
-        folder_path = await ft.FilePicker().get_directory_path(dialog_title="选择输出目录")
+        folder_path = await get_directory_path(self._page, dialog_title="选择输出目录")
         if folder_path:
             self.output_dir_field.value = folder_path
             self.output_dir_field.update()
@@ -609,7 +611,7 @@ class AudioCompressView(ft.Container):
             bgcolor=color,
             duration=3000,
         )
-        self._page.open(snackbar)
+        self._page.show_dialog(snackbar)
     
     def _compress_audio(
         self,
@@ -713,7 +715,7 @@ class AudioCompressView(ft.Container):
             bgcolor=color,
             duration=3000,
         )
-        self._page.open(snackbar)
+        self._page.show_dialog(snackbar)
     
     def _show_error(self, message: str) -> None:
         """显示错误消息。"""
@@ -722,7 +724,7 @@ class AudioCompressView(ft.Container):
             bgcolor=ft.Colors.ERROR,
             duration=3000,
         )
-        self._page.open(snackbar)
+        self._page.show_dialog(snackbar)
     
     def _on_back_click(self, e: ft.ControlEvent = None) -> None:
         """返回按钮点击事件处理。"""
@@ -753,10 +755,10 @@ class AudioCompressView(ft.Container):
         if added_count > 0:
             self._update_file_list()
             snackbar = ft.SnackBar(content=ft.Text(f"已添加 {added_count} 个文件"), bgcolor=ft.Colors.GREEN)
-            self._page.open(snackbar)
+            self._page.show_dialog(snackbar)
         elif skipped_count > 0:
             snackbar = ft.SnackBar(content=ft.Text("音频压缩不支持该格式"), bgcolor=ft.Colors.ORANGE)
-            self._page.open(snackbar)
+            self._page.show_dialog(snackbar)
         self._page.update()
     
     def cleanup(self) -> None:

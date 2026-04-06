@@ -18,6 +18,7 @@ from constants import (
     PADDING_XLARGE,
 )
 from services import ConfigService
+from utils.file_utils import save_file
 
 
 class Base64ToImageView(ft.Container):
@@ -329,7 +330,8 @@ class Base64ToImageView(ft.Container):
         format_ext = self.format_dropdown.value
         default_name = f"image.{format_ext}"
         
-        result = await ft.FilePicker().save_file(
+        result = await save_file(
+            self._page,
             dialog_title="保存图片",
             file_name=default_name,
             allowed_extensions=[format_ext],
@@ -379,7 +381,7 @@ class Base64ToImageView(ft.Container):
             content=ft.Text(message),
             bgcolor=color,
         )
-        self._page.open(snackbar)
+        self._page.show_dialog(snackbar)
     
     def add_files(self, files: list) -> None:
         """从拖放添加文件，读取文件内容作为 Base64 输入。

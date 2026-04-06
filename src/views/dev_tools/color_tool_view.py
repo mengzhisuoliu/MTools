@@ -15,6 +15,7 @@ import flet as ft
 from PIL import Image
 
 from constants import PADDING_MEDIUM, PADDING_SMALL
+from utils.file_utils import pick_files
 
 
 class ColorToolView(ft.Container):
@@ -657,17 +658,18 @@ class ColorToolView(ft.Container):
     
     async def _on_select_image(self, e):
         """选择图片按钮点击事件。"""
-        result = await ft.FilePicker().pick_files(
+        result = await pick_files(
+            self._page,
             allowed_extensions=["png", "jpg", "jpeg", "gif", "bmp", "webp"],
             allow_multiple=False,
         )
         
-        if not result or not result.files:
+        if not result:
             return
         
         try:
             # 获取选择的文件路径
-            file_path = result.files[0].path
+            file_path = result[0].path
             self.current_image_path = file_path
             
             # 加载图片
@@ -763,8 +765,8 @@ class ColorToolView(ft.Container):
         
         try:
             # 获取点击位置（相对于容器）
-            local_x = e.local_x
-            local_y = e.local_y
+            local_x = e.local_position.x
+            local_y = e.local_position.y
             
             # 检查点击是否在图片显示区域内
             if (local_x < self.img_display_x or 
@@ -891,11 +893,11 @@ class ColorToolView(ft.Container):
                 height=450,
             ),
             actions=[
-                ft.TextButton("关闭", on_click=lambda _: self._page.close(dialog)),
+                ft.TextButton("关闭", on_click=lambda _: self._page.pop_dialog()),
             ],
         )
         
-        self._page.open(dialog)
+        self._page.show_dialog(dialog)
     
     def _show_snack(self, message: str, error: bool = False):
         """显示提示消息。"""
@@ -903,7 +905,7 @@ class ColorToolView(ft.Container):
             content=ft.Text(message),
             bgcolor=ft.Colors.RED_400 if error else ft.Colors.GREEN_400,
         )
-        self._page.open(snackbar)
+        self._page.show_dialog(snackbar)
     
     def add_files(self, files: list) -> None:
         """从拖放添加文件（图片取色）。

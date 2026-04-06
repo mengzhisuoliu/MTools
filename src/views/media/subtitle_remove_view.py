@@ -24,6 +24,7 @@ from services import ConfigService, FFmpegService
 from services.subtitle_remove_service import SubtitleRemoveService
 from views.media.ffmpeg_install_view import FFmpegInstallView
 from utils import format_file_size, logger, get_unique_path
+from utils.file_utils import pick_files, get_directory_path
 
 
 class SubtitleRemoveView(ft.Container):
@@ -522,7 +523,7 @@ class SubtitleRemoveView(ft.Container):
             self.config_service.set_config_value("video_subtitle_mask_color", color)
             # 更新颜色预览
             self.mask_color_btn.content.controls[0].bgcolor = color
-            self._page.close(dialog)
+            self._page.pop_dialog()
         
         # 预设颜色
         colors = [
@@ -562,15 +563,16 @@ class SubtitleRemoveView(ft.Container):
             ],
         )
         
-        self._page.open(dialog)
+        self._page.show_dialog(dialog)
     
     def _close_dialog(self, dialog: ft.AlertDialog) -> None:
         """关闭对话框。"""
-        self._page.close(dialog)
+        self._page.pop_dialog()
     
     async def _on_select_files(self, e: ft.ControlEvent = None) -> None:
         """选择文件。"""
-        result = await ft.FilePicker().pick_files(
+        result = await pick_files(
+            self._page,
             dialog_title="选择视频文件",
             allowed_extensions=["mp4", "avi", "mov", "mkv", "flv", "wmv"],
             allow_multiple=True,
@@ -584,7 +586,7 @@ class SubtitleRemoveView(ft.Container):
     
     async def _on_select_folder(self, e: ft.ControlEvent = None) -> None:
         """选择文件夹。"""
-        result = await ft.FilePicker().get_directory_path(dialog_title="选择文件夹")
+        result = await get_directory_path(self._page, dialog_title="选择文件夹")
         if result:
             folder_path = Path(result)
             video_extensions = {".mp4", ".avi", ".mov", ".mkv", ".flv", ".wmv"}
@@ -929,8 +931,8 @@ class SubtitleRemoveView(ft.Container):
         
         def on_pan_start(e: ft.DragStartEvent):
             # 限制在有效范围内
-            x = max(0, min(display_width, e.local_x))
-            y = max(0, min(display_height, e.local_y))
+            x = max(0, min(display_width, e.local_position.x))
+            y = max(0, min(display_height, e.local_position.y))
             draw_state['start_x'] = x
             draw_state['start_y'] = y
             selection_box.left = x
@@ -942,8 +944,8 @@ class SubtitleRemoveView(ft.Container):
         
         def on_pan_update(e: ft.DragUpdateEvent):
             # 限制范围
-            end_x = max(0, min(display_width, e.local_x))
-            end_y = max(0, min(display_height, e.local_y))
+            end_x = max(0, min(display_width, e.local_position.x))
+            end_y = max(0, min(display_height, e.local_position.y))
             
             # 保存当前位置
             draw_state['end_x'] = end_x
@@ -1043,7 +1045,7 @@ class SubtitleRemoveView(ft.Container):
             self._page.update()
         
         def close_dialog(e):
-            self._page.close(dialog)
+            self._page.pop_dialog()
         
         def on_confirm(e):
             if regions_list:
@@ -1051,7 +1053,7 @@ class SubtitleRemoveView(ft.Container):
             elif str(file_path) in self.file_regions:
                 del self.file_regions[str(file_path)]
             
-            self._page.close(dialog)
+            self._page.pop_dialog()
             self._update_file_list()
             logger.info(f"已保存 {file_path.name} 的 {len(regions_list)} 个区域")
         
@@ -1074,7 +1076,7 @@ class SubtitleRemoveView(ft.Container):
                     self.file_regions[str(other_file)] = [r.copy() for r in regions_list]
                     applied_count += 1
             
-            self._page.close(dialog)
+            self._page.pop_dialog()
             self._update_file_list()
             self._show_snackbar(f"已将区域设置应用到所有 {applied_count + 1} 个文件")
             logger.info(f"已将 {len(regions_list)} 个区域应用到 {applied_count + 1} 个文件")
@@ -1180,12 +1182,12 @@ class SubtitleRemoveView(ft.Container):
             actions_alignment=ft.MainAxisAlignment.END,
         )
         
-        self._page.open(dialog)
+        self._page.show_dialog(dialog)
     
     def _show_snackbar(self, message: str, color: str = None) -> None:
         """显示 snackbar 提示。"""
         snackbar = ft.SnackBar(content=ft.Text(message), bgcolor=color)
-        self._page.open(snackbar)
+        self._page.show_dialog(snackbar)
     
     def _clear_files(self) -> None:
         """清空文件列表。"""
@@ -1492,11 +1494,11 @@ class SubtitleRemoveView(ft.Container):
         """删除模型文件。"""
         # 确认对话框
         def confirm_delete(e):
-            self._page.close(dlg)
+            self._page.pop_dialog()
             self._page.run_task(self._async_delete_model)
         
         def cancel_delete(e):
-            self._page.close(dlg)
+            self._page.pop_dialog()
         
         dlg = ft.AlertDialog(
             title=ft.Text("确认删除"),
@@ -1506,7 +1508,7 @@ class SubtitleRemoveView(ft.Container):
                 ft.TextButton("删除", on_click=confirm_delete),
             ],
         )
-        self._page.open(dlg)
+        self._page.show_dialog(dlg)
     
     async def _async_delete_model(self) -> None:
         """异步删除模型文件。"""
@@ -1558,7 +1560,7 @@ class SubtitleRemoveView(ft.Container):
     
     async def _select_output_dir(self, e: ft.ControlEvent = None) -> None:
         """选择输出目录。"""
-        result = await ft.FilePicker().get_directory_path(dialog_title="选择输出目录")
+        result = await get_directory_path(self._page, dialog_title="选择输出目录")
         if result:
             self.output_dir_field.value = result
             self._page.update()
@@ -2004,10 +2006,10 @@ class SubtitleRemoveView(ft.Container):
         if added_count > 0:
             self._update_file_list()
             snackbar = ft.SnackBar(content=ft.Text(f"已添加 {added_count} 个文件"), bgcolor=ft.Colors.GREEN)
-            self._page.open(snackbar)
+            self._page.show_dialog(snackbar)
         elif skipped_count > 0:
             snackbar = ft.SnackBar(content=ft.Text("字幕去除不支持该格式"), bgcolor=ft.Colors.ORANGE)
-            self._page.open(snackbar)
+            self._page.show_dialog(snackbar)
     
     def cleanup(self) -> None:
         """清理视图资源，释放内存。

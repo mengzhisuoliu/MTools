@@ -21,6 +21,7 @@ from constants import (
 from models import GifAdjustmentOptions
 from services import ConfigService, ImageService, FFmpegService
 from utils import format_file_size, GifUtils, logger, get_unique_path
+from utils.file_utils import pick_files, save_file
 from views.media.ffmpeg_install_view import FFmpegInstallView
 
 
@@ -603,7 +604,8 @@ class GifAdjustmentView(ft.Container):
         Args:
             e: 控件事件对象
         """
-        result = await ft.FilePicker().pick_files(
+        result = await pick_files(
+            self._page,
             dialog_title="选择 GIF 或实况图文件",
             allowed_extensions=["gif", "jpg", "jpeg", "jfif", "heic", "heif"],
             allow_multiple=False,
@@ -1046,7 +1048,8 @@ class GifAdjustmentView(ft.Container):
         
         default_name = f"{self.selected_file.stem}_adjusted{file_ext}" if self.selected_file else f"output{file_ext}"
         
-        result = await ft.FilePicker().save_file(
+        result = await save_file(
+            self._page,
             dialog_title=dialog_title,
             file_name=default_name,
             allowed_extensions=allowed_exts,
@@ -1617,7 +1620,7 @@ class GifAdjustmentView(ft.Container):
             bgcolor=color,
             duration=3000,
         )
-        self._page.open(snackbar)
+        self._page.show_dialog(snackbar)
     
     def _show_ffmpeg_install_view(self) -> None:
         """显示 FFmpeg 安装视图。"""

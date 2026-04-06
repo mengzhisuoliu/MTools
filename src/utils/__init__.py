@@ -12,6 +12,9 @@ from .file_utils import (
     get_unique_path,
     list_files_by_extension,
     move_file,
+    pick_files,
+    get_directory_path,
+    save_file,
 )
 from .gif_utils import GifUtils
 from .logger import (
@@ -85,6 +88,9 @@ __all__ = [
     "get_system_fonts",
     "get_unique_path",
     "list_files_by_extension",
+    "pick_files",
+    "get_directory_path",
+    "save_file",
     "GifUtils",
     "logger",
     "Logger",

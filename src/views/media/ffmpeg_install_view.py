@@ -245,5 +245,5 @@ class FFmpegInstallView(ft.Container):
             bgcolor=color,
             duration=3000,
         )
-        self._page.open(snackbar)
+        self._page.show_dialog(snackbar)
 

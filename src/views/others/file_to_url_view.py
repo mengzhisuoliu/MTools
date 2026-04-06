@@ -21,6 +21,7 @@ from constants import (
     PADDING_SMALL,
 )
 from utils import format_file_size, logger
+from utils.file_utils import pick_files
 
 
 # 禁止上传的文件扩展名
@@ -305,7 +306,8 @@ class FileToUrlView(ft.Container):
     
     async def _on_select_files(self, e: ft.ControlEvent) -> None:
         """选择文件按钮点击事件。"""
-        result = await ft.FilePicker().pick_files(
+        result = await pick_files(
+            self._page,
             dialog_title="选择文件",
             allow_multiple=True,
         )
@@ -714,7 +716,7 @@ class FileToUrlView(ft.Container):
             bgcolor=color,
             duration=2000,
         )
-        self._page.open(snackbar)
+        self._page.show_dialog(snackbar)
     
     def add_files(self, files: list) -> None:
         """从拖放添加文件。

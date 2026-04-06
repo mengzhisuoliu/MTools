@@ -29,6 +29,7 @@ from constants import (
 )
 from services import ConfigService, ImageService
 from utils import GifUtils, format_file_size, get_unique_path
+from utils.file_utils import pick_files, get_directory_path, save_file
 
 # 屏蔽 libpng 的 iCCP 警告
 warnings.filterwarnings("ignore", message=".*iCCP.*")
@@ -898,7 +899,8 @@ class ImageCropView(ft.Container):
 
     async def _on_select_files(self, e: ft.ControlEvent) -> None:
         """选择文件按钮点击事件。"""
-        result = await ft.FilePicker().pick_files(
+        result = await pick_files(
+            self._page,
             dialog_title="选择图片文件",
             allowed_extensions=[
                 "jpg",
@@ -923,7 +925,7 @@ class ImageCropView(ft.Container):
 
     async def _on_select_folder(self, e: ft.ControlEvent) -> None:
         """选择文件夹按钮点击事件。"""
-        result = await ft.FilePicker().get_directory_path(dialog_title="选择图片文件夹")
+        result = await get_directory_path(self._page, dialog_title="选择图片文件夹")
         
         if result:
             folder = Path(result)
@@ -1141,7 +1143,7 @@ class ImageCropView(ft.Container):
 
     async def _on_browse_output(self, e: ft.ControlEvent) -> None:
         """浏览输出目录按钮点击事件。"""
-        result = await ft.FilePicker().get_directory_path(dialog_title="选择输出目录")
+        result = await get_directory_path(self._page, dialog_title="选择输出目录")
         
         if result:
             self.custom_output_dir.value = result
@@ -1156,7 +1158,7 @@ class ImageCropView(ft.Container):
             bgcolor=color,
             duration=2000,
         )
-        self._page.open(snackbar)
+        self._page.show_dialog(snackbar)
 
     async def _on_canvas_click(self, e: ft.ControlEvent) -> None:
         """点击裁剪区域，如果未选择图片则打开选择文件对话框。"""
@@ -1165,7 +1167,8 @@ class ImageCropView(ft.Container):
 
     async def _on_select_file(self, e: ft.ControlEvent) -> None:
         """选择文件。"""
-        result = await ft.FilePicker().pick_files(
+        result = await pick_files(
+            self._page,
             dialog_title="选择图片",
             allowed_extensions=["jpg", "jpeg", "jfif", "png", "bmp", "webp", "gif"],
             allow_multiple=False,
@@ -1265,26 +1268,26 @@ class ImageCropView(ft.Container):
             self.img_display_y = 0
 
     def _throttled_update_position(self) -> None:
-        """节流更新裁剪框位置,减少page.update()调用频率"""
+        """节流更新裁剪框位置,减少UI刷新频率"""
         import time
 
         current_time = time.time()
 
-        # 节流时间间隔(秒) - 30ms更新一次,约33fps
-        throttle_interval = 0.03
+        # 节流时间间隔(秒) - 16ms更新一次,约60fps
+        throttle_interval = 0.016
 
-        # 更新位置数据(不刷新UI)
-        self._update_crop_box_position_data()
+        # 更新位置数据(不刷新UI，不更新刻度尺)
+        self._update_crop_box_position_data(update_rulers=False)
 
         # 只有距离上次更新超过节流间隔才真正刷新UI
         if current_time - self._last_update_time >= throttle_interval:
             try:
-                self._page.update()
+                self.crop_canvas.update()
                 self._last_update_time = current_time
             except Exception:
                 pass
 
-    def _update_crop_box_position_data(self) -> None:
+    def _update_crop_box_position_data(self, update_rulers: bool = True) -> None:
         """只更新裁剪框位置数据,不调用page.update()"""
         if not self.original_image:
             return
@@ -1327,8 +1330,8 @@ class ImageCropView(ft.Container):
         self.handle_se.left = box_left + box_w - handle_offset
         self.handle_se.visible = True
 
-        # 更新刻度尺
-        self._update_rulers()
+        if update_rulers:
+            self._update_rulers()
 
     def _update_crop_box_position(self, skip_update: bool = False) -> None:
         """更新裁剪框在画布上的位置。
@@ -1491,8 +1494,8 @@ class ImageCropView(ft.Container):
     def _on_crop_pan_start(self, e: ft.DragStartEvent) -> None:
         """开始拖动裁剪框。"""
         self.is_dragging = True
-        self.drag_start_x = e.global_x
-        self.drag_start_y = e.global_y
+        self.drag_start_x = e.global_position.x
+        self.drag_start_y = e.global_position.y
         self.crop_start_x = self.crop_x
         self.crop_start_y = self.crop_y
 
@@ -1502,8 +1505,8 @@ class ImageCropView(ft.Container):
             return
 
         # 计算移动距离
-        dx = e.global_x - self.drag_start_x
-        dy = e.global_y - self.drag_start_y
+        dx = e.global_position.x - self.drag_start_x
+        dy = e.global_position.y - self.drag_start_y
 
         # 计算缩放比例（显示尺寸到图片尺寸）
         img_w, img_h = self.original_image.width, self.original_image.height
@@ -1535,14 +1538,14 @@ class ImageCropView(ft.Container):
     def _on_crop_pan_end(self, e: ft.DragEndEvent) -> None:
         """拖动结束。"""
         self.is_dragging = False
-        # 拖动结束后更新预览
+        self._update_rulers()
         self._update_preview()
 
     def _on_resize_start(self, e: ft.DragStartEvent, mode: str) -> None:
         """开始调整大小。"""
         self.resize_mode = mode
-        self.drag_start_x = e.global_x
-        self.drag_start_y = e.global_y
+        self.drag_start_x = e.global_position.x
+        self.drag_start_y = e.global_position.y
         self.crop_start_x = self.crop_x
         self.crop_start_y = self.crop_y
         # 记录初始宽高（用于计算调整量）
@@ -1555,8 +1558,8 @@ class ImageCropView(ft.Container):
             return
 
         # 计算移动距离
-        dx = e.global_x - self.drag_start_x
-        dy = e.global_y - self.drag_start_y
+        dx = e.global_position.x - self.drag_start_x
+        dy = e.global_position.y - self.drag_start_y
 
         # 计算缩放比例（显示尺寸到图片尺寸）
         img_w, img_h = self.original_image.width, self.original_image.height
@@ -1618,7 +1621,7 @@ class ImageCropView(ft.Container):
     def _on_resize_end(self, e: ft.DragEndEvent) -> None:
         """调整大小结束。"""
         self.resize_mode = None
-        # 调整大小结束后更新预览
+        self._update_rulers()
         self._update_preview()
 
     def _schedule_preview_update(self) -> None:
@@ -1741,7 +1744,8 @@ class ImageCropView(ft.Container):
                 default_filename = f"{self.selected_file.stem}_cropped.png"
                 allowed_extensions = ["png", "jpg", "jpeg", "jfif", "webp"]
 
-            result = await ft.FilePicker().save_file(
+            result = await save_file(
+                self._page,
                 dialog_title="保存裁剪结果",
                 file_name=default_filename,
                 allowed_extensions=allowed_extensions,
@@ -1773,7 +1777,7 @@ class ImageCropView(ft.Container):
                 bgcolor=ft.Colors.GREEN,
                 duration=2000,
             )
-            self._page.open(snackbar)
+            self._page.show_dialog(snackbar)
         except Exception as ex:
             logger.error(f"保存失败: {ex}")
             self._show_snackbar(f"保存失败: {str(ex)}", ft.Colors.RED)
@@ -2267,7 +2271,7 @@ class ImageCropView(ft.Container):
             bgcolor=color,
             duration=3000,
         )
-        self._page.open(snackbar)
+        self._page.show_dialog(snackbar)
 
     def _on_window_resize(self, e: ft.ControlEvent) -> None:
         """窗口大小变化时的处理。"""

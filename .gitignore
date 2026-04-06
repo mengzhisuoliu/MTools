@@ -24,6 +24,7 @@ storage/
 tests/
 .pytest_cache/
 .DS_Store
+flet_build.py
 
 # Virtual Environment
 venv/

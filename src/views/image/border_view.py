@@ -18,6 +18,7 @@ from constants import (
 )
 from services import ConfigService, ImageService
 from utils import format_file_size, GifUtils, get_unique_path
+from utils.file_utils import pick_files, get_directory_path
 
 
 class ImageBorderView(ft.Container):
@@ -520,7 +521,8 @@ class ImageBorderView(ft.Container):
     
     async def _on_select_files(self, e: ft.ControlEvent) -> None:
         """选择文件按钮点击事件。"""
-        result = await ft.FilePicker().pick_files(
+        result = await pick_files(
+            self._page,
             dialog_title="选择图片文件",
             allowed_extensions=["jpg", "jpeg", "jfif", "png", "webp", "bmp", "gif", "tiff", "tif", "ico", "avif", "heic", "heif"],
             allow_multiple=True,
@@ -534,7 +536,7 @@ class ImageBorderView(ft.Container):
     
     async def _on_select_folder(self, e: ft.ControlEvent) -> None:
         """选择文件夹按钮点击事件。"""
-        folder_path = await ft.FilePicker().get_directory_path(dialog_title="选择图片文件夹")
+        folder_path = await get_directory_path(self._page, dialog_title="选择图片文件夹")
         if folder_path:
             folder = Path(folder_path)
             extensions = [".jpg", ".jpeg", ".jfif", ".png", ".webp", ".bmp", ".gif", ".tiff", ".tif", ".ico", ".avif", ".heic", ".heif"]
@@ -917,7 +919,7 @@ class ImageBorderView(ft.Container):
                 self.color_hex_field.update()
                 self.color_preview.update()
             
-            self._page.close(dialog)
+            self._page.pop_dialog()
         
         # 创建对话框
         dialog = ft.AlertDialog(
@@ -991,7 +993,7 @@ class ImageBorderView(ft.Container):
             actions_alignment=ft.MainAxisAlignment.END,
         )
         
-        self._page.open(dialog)
+        self._page.show_dialog(dialog)
     
     def _update_color_preview_in_dialog(
         self,
@@ -1048,7 +1050,7 @@ class ImageBorderView(ft.Container):
     
     async def _on_browse_output(self, e: ft.ControlEvent) -> None:
         """浏览输出目录按钮点击事件。"""
-        folder_path = await ft.FilePicker().get_directory_path(dialog_title="选择输出目录")
+        folder_path = await get_directory_path(self._page, dialog_title="选择输出目录")
         if folder_path:
             self.custom_output_dir.value = folder_path
             self.custom_output_dir.update()
@@ -1383,7 +1385,7 @@ class ImageBorderView(ft.Container):
             bgcolor=color,
             duration=2000,
         )
-        self._page.open(snackbar)
+        self._page.show_dialog(snackbar)
     
     def cleanup(self) -> None:
         """清理视图资源，释放内存。"""

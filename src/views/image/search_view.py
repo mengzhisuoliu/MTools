@@ -18,6 +18,7 @@ from typing import Optional, Dict, List, Any, Callable
 from constants import PADDING_LARGE, PADDING_MEDIUM, PADDING_SMALL
 from services.sogou_search_service import SogouSearchService
 from utils import logger
+from utils.file_utils import pick_files
 
 
 class ImageSearchView(ft.Container):
@@ -341,7 +342,8 @@ class ImageSearchView(ft.Container):
         
     async def _on_select_local_image(self, e: ft.ControlEvent):
         """选择本地图片"""
-        result = await ft.FilePicker().pick_files(
+        result = await pick_files(
+            self._page,
             allowed_extensions=["jpg", "jpeg", "png", "gif", "bmp", "webp"],
             dialog_title="选择要搜索的图片"
         )
@@ -660,7 +662,7 @@ class ImageSearchView(ft.Container):
             bgcolor=color,
             duration=2000,
         )
-        self._page.open(snackbar)
+        self._page.show_dialog(snackbar)
     
     def _handle_back(self, e: ft.ControlEvent = None):
         """处理返回按钮点击"""
@@ -681,7 +683,7 @@ class ImageSearchView(ft.Container):
     def _show_error(self, message: str):
         """显示错误消息"""
         def close_dialog(e):
-            self._page.close(dialog)
+            self._page.pop_dialog()
             
         dialog = ft.AlertDialog(
             title=ft.Text("错误"),
@@ -691,7 +693,7 @@ class ImageSearchView(ft.Container):
             ],
         )
         
-        self._page.open(dialog)
+        self._page.show_dialog(dialog)
     
     def add_files(self, files: list) -> None:
         """从拖放添加文件（只取第一个支持的文件）。"""

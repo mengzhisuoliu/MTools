@@ -19,6 +19,7 @@ from constants import (
 )
 from services import ConfigService, ImageService
 from utils import get_unique_path
+from utils.file_utils import pick_files, get_directory_path
 
 
 class ImageRotateView(ft.Container):
@@ -644,7 +645,7 @@ class ImageRotateView(ft.Container):
                 self._update_fill_color_display()
                 # 更新预览
                 self._update_preview()
-            self._page.close(dialog)
+            self._page.pop_dialog()
         
         # 创建对话框
         dialog = ft.AlertDialog(
@@ -725,7 +726,7 @@ class ImageRotateView(ft.Container):
             actions_alignment=ft.MainAxisAlignment.END,
         )
         
-        self._page.open(dialog)
+        self._page.show_dialog(dialog)
     
     def _update_color_preview_in_dialog(
         self,
@@ -764,7 +765,7 @@ class ImageRotateView(ft.Container):
     
     async def _on_select_files(self, e: ft.ControlEvent) -> None:
         """选择文件按钮点击事件。"""
-        result = await ft.FilePicker().pick_files(
+        result = await pick_files(self._page,
             dialog_title="选择图片",
             allowed_extensions=["jpg", "jpeg", "png", "gif", "bmp", "webp"],
             allow_multiple=True,
@@ -848,7 +849,7 @@ class ImageRotateView(ft.Container):
     
     async def _on_browse_output(self, e: ft.ControlEvent) -> None:
         """浏览输出目录按钮点击事件。"""
-        folder_path = await ft.FilePicker().get_directory_path(dialog_title="选择输出目录")
+        folder_path = await get_directory_path(self._page, dialog_title="选择输出目录")
         if folder_path:
             self.custom_output_dir.value = folder_path
             try:
@@ -1145,7 +1146,7 @@ class ImageRotateView(ft.Container):
             bgcolor=color,
             duration=2000,
         )
-        self._page.open(snackbar)
+        self._page.show_dialog(snackbar)
     
     def add_files(self, files: list) -> None:
         """从拖放添加文件。"""

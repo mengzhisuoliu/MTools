@@ -18,6 +18,7 @@ from constants import (
 )
 from services import ConfigService, ImageService
 from utils import format_file_size, GifUtils, logger, get_unique_path
+from utils.file_utils import pick_files, get_directory_path
 
 
 class ImageFormatView(ft.Container):
@@ -494,7 +495,8 @@ class ImageFormatView(ft.Container):
     
     async def _on_select_files(self, e: ft.ControlEvent) -> None:
         """选择文件按钮点击事件。"""
-        result = await ft.FilePicker().pick_files(
+        result = await pick_files(
+            self._page,
             dialog_title="选择图片文件",
             allowed_extensions=["jpg", "jpeg", "jfif", "png", "webp", "bmp", "gif", "tiff", "tif", "ico"],
             allow_multiple=True,
@@ -509,7 +511,7 @@ class ImageFormatView(ft.Container):
     
     async def _on_select_folder(self, e: ft.ControlEvent) -> None:
         """选择文件夹按钮点击事件。"""
-        result = await ft.FilePicker().get_directory_path(dialog_title="选择图片文件夹")
+        result = await get_directory_path(self._page, dialog_title="选择图片文件夹")
         
         if result:
             folder: Path = Path(result)
@@ -761,7 +763,7 @@ class ImageFormatView(ft.Container):
     
     async def _on_browse_output(self, e: ft.ControlEvent) -> None:
         """浏览输出目录按钮点击事件。"""
-        result = await ft.FilePicker().get_directory_path(dialog_title="选择输出目录")
+        result = await get_directory_path(self._page, dialog_title="选择输出目录")
         
         if result:
             self.custom_output_dir.value = result
@@ -881,7 +883,7 @@ class ImageFormatView(ft.Container):
             bgcolor=color,
             duration=2000,
         )
-        self._page.open(snackbar)
+        self._page.show_dialog(snackbar)
     
     def add_files(self, files: list) -> None:
         """从拖放添加文件。"""

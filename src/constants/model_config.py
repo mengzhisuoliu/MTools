@@ -886,51 +886,6 @@ OCR_MODELS: Final[dict[str, OCRModelInfo]] = {
 DEFAULT_OCR_MODEL_KEY: Final[str] = "ppocr_v5"
 
 
-# ICP 备案查询验证码识别模型配置
-@dataclass
-class ICPModelInfo:
-    """ICP 验证码识别模型信息数据类。
-    
-    Attributes:
-        name: 模型名称
-        display_name: 显示名称
-        detector_url: 检测模型(ibig)下载链接
-        siamese_url: 相似度模型(isma)下载链接
-        size_mb: 总文件大小(MB)
-        quality: 质量描述
-        performance: 性能描述
-        detector_filename: 检测模型文件名
-        siamese_filename: 相似度模型文件名
-        version: 版本号
-    """
-    name: str
-    display_name: str
-    detector_url: str
-    siamese_url: str
-    size_mb: int
-    quality: str
-    performance: str
-    detector_filename: str = "ibig.onnx"
-    siamese_filename: str = "isma.onnx"
-    version: str = "1.0"
-
-
-ICP_MODELS: Final[dict[str, ICPModelInfo]] = {
-    "icp_v1": ICPModelInfo(
-        name="icp_v1",
-        display_name="ICP 验证码识别",
-        detector_url="https://www.modelscope.cn/models/yiminger/MyTools_Models/resolve/master/models/icp/ibig.onnx",
-        siamese_url="https://www.modelscope.cn/models/yiminger/MyTools_Models/resolve/master/models/icp/isma.onnx",
-        size_mb=20,
-        quality="高精度识别",
-        performance="准确率高 | 识别速度 ~0.09s",
-        version="1.0"
-    ),
-}
-
-# 默认 ICP 模型
-DEFAULT_ICP_MODEL_KEY: Final[str] = "icp_v1"
-
 
 # 人脸检测模型配置（用于证件照等场景）
 @dataclass

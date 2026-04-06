@@ -22,6 +22,7 @@ from constants import (
 )
 from services import ConfigService, ImageService
 from utils import get_unique_path
+from utils.file_utils import pick_files, get_directory_path
 
 
 class ImageWatermarkView(ft.Container):
@@ -883,7 +884,7 @@ class ImageWatermarkView(ft.Container):
                     int(b_slider.value),
                 )
                 self._update_color_display()
-            self._page.close(dialog)
+            self._page.pop_dialog()
         
         # 创建对话框
         dialog = ft.AlertDialog(
@@ -957,7 +958,7 @@ class ImageWatermarkView(ft.Container):
             actions_alignment=ft.MainAxisAlignment.END,
         )
         
-        self._page.open(dialog)
+        self._page.show_dialog(dialog)
     
     def _update_color_preview_in_dialog(
         self,
@@ -1039,7 +1040,7 @@ class ImageWatermarkView(ft.Container):
     
     async def _on_select_watermark_image(self, e: ft.ControlEvent) -> None:
         """选择水印图片按钮点击事件。"""
-        result = await ft.FilePicker().pick_files(
+        result = await pick_files(self._page,
             dialog_title="选择水印图片",
             allowed_extensions=["png", "jpg", "jpeg", "gif", "PNG", "JPG", "JPEG", "GIF"],
             allow_multiple=False,
@@ -1109,7 +1110,7 @@ class ImageWatermarkView(ft.Container):
     
     async def _on_select_font_file(self, e: ft.ControlEvent) -> None:
         """选择字体文件按钮点击事件。"""
-        result = await ft.FilePicker().pick_files(
+        result = await pick_files(self._page,
             dialog_title="选择字体文件",
             allowed_extensions=["ttf", "ttc", "otf", "TTF", "TTC", "OTF"],
             allow_multiple=False,
@@ -1234,7 +1235,7 @@ class ImageWatermarkView(ft.Container):
     
     async def _on_select_files(self, e: ft.ControlEvent) -> None:
         """选择文件按钮点击事件（增量选择）。"""
-        result = await ft.FilePicker().pick_files(
+        result = await pick_files(self._page,
             dialog_title="选择图片",
             allowed_extensions=["jpg", "jpeg", "png", "bmp", "webp"],
             allow_multiple=True,
@@ -1256,7 +1257,7 @@ class ImageWatermarkView(ft.Container):
     
     async def _on_select_folder(self, e: ft.ControlEvent) -> None:
         """选择文件夹按钮点击事件。"""
-        folder_path = await ft.FilePicker().get_directory_path(dialog_title="选择图片文件夹")
+        folder_path = await get_directory_path(self._page, dialog_title="选择图片文件夹")
         if folder_path:
             folder = Path(folder_path)
             # 获取文件夹中的所有图片
@@ -1387,7 +1388,7 @@ class ImageWatermarkView(ft.Container):
     
     async def _on_browse_output(self, e: ft.ControlEvent) -> None:
         """浏览输出目录按钮点击事件。"""
-        folder_path = await ft.FilePicker().get_directory_path(dialog_title="选择输出目录")
+        folder_path = await get_directory_path(self._page, dialog_title="选择输出目录")
         if folder_path:
             self.custom_output_dir.value = folder_path
             try:
@@ -1882,7 +1883,7 @@ class ImageWatermarkView(ft.Container):
             bgcolor=color,
             duration=2000,
         )
-        self._page.open(snackbar)
+        self._page.show_dialog(snackbar)
     
     def add_files(self, files: list) -> None:
         """从拖放添加文件。"""

@@ -148,7 +148,7 @@ class MediaView(ft.Container):
     def _show_snackbar(self, message: str) -> None:
         """显示提示消息。"""
         snackbar = ft.SnackBar(content=ft.Text(message), duration=2000)
-        self._page.open(snackbar)
+        self._page.show_dialog(snackbar)
     
     def _create_card(self, icon, title, description, gradient_colors, on_click, tool_id):
         """创建带置顶功能的卡片，外层包裹 Dropzone 支持拖放。"""
@@ -781,7 +781,7 @@ cd /d "{work_dir}"
                 bgcolor=ft.Colors.GREEN,
                 duration=2000,
             )
-            self._page.open(snackbar)
+            self._page.show_dialog(snackbar)
             
         except Exception as e:
             # 显示错误消息
@@ -790,7 +790,7 @@ cd /d "{work_dir}"
                 bgcolor=ft.Colors.ERROR,
                 duration=3000,
             )
-            self._page.open(snackbar)
+            self._page.show_dialog(snackbar)
     
     def restore_state(self) -> bool:
         """恢复视图状态。
@@ -947,4 +947,4 @@ cd /d "{work_dir}"
             content=ft.Text(message),
             duration=3000,
         )
-        self._saved_page.open(snackbar)
+        self._saved_page.show_dialog(snackbar)

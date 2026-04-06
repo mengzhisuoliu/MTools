@@ -20,6 +20,7 @@ from constants import (
 )
 from services import ConfigService, FFmpegService
 from utils import format_file_size, logger, get_unique_path
+from utils.file_utils import pick_files, get_directory_path
 from views.media.ffmpeg_install_view import FFmpegInstallView
 
 
@@ -440,9 +441,10 @@ class VideoConvertView(ft.Container):
     
     async def _on_select_files(self, e: ft.ControlEvent) -> None:
         """选择文件按钮点击事件。"""
-        result = await ft.FilePicker().pick_files(
-            allowed_extensions=["mp4", "avi", "mkv", "mov", "flv", "wmv", "webm", "m4v", "mpg", "mpeg", "ts", "mts", "m2ts"],
+        result = await pick_files(
+            self._page,
             dialog_title="选择视频文件",
+            allowed_extensions=["mp4", "avi", "mkv", "mov", "flv", "wmv", "webm", "m4v", "mpg", "mpeg", "ts", "mts", "m2ts"],
             allow_multiple=True,
         )
         if result and result.files:
@@ -456,7 +458,7 @@ class VideoConvertView(ft.Container):
     
     async def _on_select_folder(self, e: ft.ControlEvent) -> None:
         """选择文件夹按钮点击事件。"""
-        result = await ft.FilePicker().get_directory_path(dialog_title="选择包含视频的文件夹")
+        result = await get_directory_path(self._page, dialog_title="选择包含视频的文件夹")
         if result:
             folder_path = Path(result)
             video_extensions = {".mp4", ".avi", ".mkv", ".mov", ".flv", ".wmv", ".webm", ".m4v", ".mpg", ".mpeg", ".ts", ".mts", ".m2ts"}
@@ -579,7 +581,7 @@ class VideoConvertView(ft.Container):
     
     async def _on_browse_output(self, e: ft.ControlEvent) -> None:
         """浏览输出目录按钮点击事件。"""
-        result = await ft.FilePicker().get_directory_path(dialog_title="选择输出目录")
+        result = await get_directory_path(self._page, dialog_title="选择输出目录")
         if result:
             self.custom_output_dir.value = result
             self.output_custom_path = Path(result)
@@ -916,7 +918,7 @@ class VideoConvertView(ft.Container):
             content=ft.Text(message),
             bgcolor=ft.Colors.ERROR,
         )
-        self._page.open(snackbar)
+        self._page.show_dialog(snackbar)
     
     def _show_success(self, message: str) -> None:
         """显示成功消息。"""
@@ -924,7 +926,7 @@ class VideoConvertView(ft.Container):
             content=ft.Text(message),
             bgcolor=ft.Colors.GREEN,
         )
-        self._page.open(snackbar)
+        self._page.show_dialog(snackbar)
     
     def add_files(self, files: list) -> None:
         """从拖放添加文件。"""

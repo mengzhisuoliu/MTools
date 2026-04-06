@@ -24,6 +24,7 @@ from constants import (
 )
 from services import ConfigService, OCRService
 from utils import format_file_size, logger, get_unique_path
+from utils.file_utils import pick_files, get_directory_path
 
 
 class OCRView(ft.Container):
@@ -506,7 +507,7 @@ class OCRView(ft.Container):
     
     async def _on_select_files(self, e: ft.ControlEvent) -> None:
         """选择文件事件。"""
-        result = await ft.FilePicker().pick_files(
+        result = await pick_files(self._page,
             allowed_extensions=["jpg", "jpeg", "png", "bmp", "tiff", "tif", "webp"],
             dialog_title="选择图片",
             allow_multiple=True,
@@ -522,7 +523,7 @@ class OCRView(ft.Container):
     
     async def _on_select_folder(self, e: ft.ControlEvent) -> None:
         """选择文件夹事件。"""
-        result = await ft.FilePicker().get_directory_path(dialog_title="选择文件夹")
+        result = await get_directory_path(self._page, dialog_title="选择文件夹")
         
         if result:
             folder_path = Path(result)
@@ -783,7 +784,7 @@ class OCRView(ft.Container):
     
     async def _on_browse_output(self, e: ft.ControlEvent) -> None:
         """浏览输出目录按钮点击事件。"""
-        result = await ft.FilePicker().get_directory_path(dialog_title="选择输出目录")
+        result = await get_directory_path(self._page, dialog_title="选择输出目录")
         
         if result:
             self.custom_output_dir.value = result
@@ -964,11 +965,11 @@ class OCRView(ft.Container):
             title=ft.Text("确认删除"),
             content=ft.Text(f"确定要删除模型 {self.current_model.display_name} 吗？\n删除后需要重新下载才能使用。"),
             actions=[
-                ft.TextButton("取消", on_click=lambda _: self._page.close(dialog)),
-                ft.TextButton("删除", on_click=lambda _: (self._page.close(dialog), confirm_delete(True), self._page.update())),
+                ft.TextButton("取消", on_click=lambda _: self._page.pop_dialog()),
+                ft.TextButton("删除", on_click=lambda _: (self._page.pop_dialog(), confirm_delete(True), self._page.update())),
             ],
         )
-        self._page.open(dialog)
+        self._page.show_dialog(dialog)
     
     def _on_recognize(self, e: ft.ControlEvent) -> None:
         """开始识别。"""
@@ -1467,7 +1468,7 @@ class OCRView(ft.Container):
             content=ft.Text(message),
             bgcolor=color,
         )
-        self._page.open(snack_bar)
+        self._page.show_dialog(snack_bar)
     
     def add_files(self, files: list) -> None:
         """从拖放添加文件。"""

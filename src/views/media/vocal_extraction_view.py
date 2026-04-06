@@ -19,6 +19,7 @@ from constants import (
 )
 from services import ConfigService, VocalSeparationService, FFmpegService
 from utils import format_file_size, logger
+from utils.file_utils import pick_files, get_directory_path
 from views.media.ffmpeg_install_view import FFmpegInstallView
 
 
@@ -569,7 +570,8 @@ class VocalExtractionView(ft.Container):
     
     async def _on_select_files(self) -> None:
         """选择文件按钮点击事件。"""
-        files = await ft.FilePicker().pick_files(
+        files = await pick_files(
+            self._page,
             dialog_title="选择音频文件",
             allowed_extensions=["mp3", "wav", "flac", "m4a", "aac", "ogg", "wma", "opus"],
             allow_multiple=True,
@@ -583,8 +585,8 @@ class VocalExtractionView(ft.Container):
     
     async def _on_select_folder(self) -> None:
         """选择文件夹按钮点击事件。"""
-        folder_path = await ft.FilePicker().get_directory_path(
-            dialog_title="选择包含音频的文件夹"
+        folder_path = await get_directory_path(
+            self._page, dialog_title="选择包含音频的文件夹"
         )
         if folder_path:
             audio_extensions = {".mp3", ".wav", ".flac", ".m4a", ".aac", ".ogg", ".wma", ".opus"}
@@ -894,7 +896,7 @@ class VocalExtractionView(ft.Container):
             content=ft.Text(message),
             bgcolor=bgcolor,
         )
-        self._page.open(snackbar)
+        self._page.show_dialog(snackbar)
     
     def _on_model_change(self, e: ft.ControlEvent) -> None:
         """模型选择变化事件。"""
@@ -1159,19 +1161,19 @@ class VocalExtractionView(ft.Container):
             title=ft.Text("确认删除"),
             content=ft.Text(f"确定要删除模型 {model_info.display_name} 吗？"),
             actions=[
-                ft.TextButton("取消", on_click=lambda _: self._page.close(dialog)),
+                ft.TextButton("取消", on_click=lambda _: self._page.pop_dialog()),
                 ft.TextButton(
                     "删除",
                     on_click=lambda _: (
                         on_confirm(True),
-                        self._page.close(dialog),
+                        self._page.pop_dialog(),
                     )
                 ),
             ],
             actions_alignment=ft.MainAxisAlignment.END,
         )
         
-        self._page.open(dialog)
+        self._page.show_dialog(dialog)
     
     def _on_output_mode_change(self, e: ft.ControlEvent) -> None:
         """输出模式变化事件。"""
@@ -1200,7 +1202,7 @@ class VocalExtractionView(ft.Container):
     
     async def _on_browse_output(self) -> None:
         """浏览输出目录按钮点击事件。"""
-        folder_path = await ft.FilePicker().get_directory_path(dialog_title="选择输出目录")
+        folder_path = await get_directory_path(self._page, dialog_title="选择输出目录")
         if folder_path:
             self.output_dir_field.value = folder_path
             self._page.update()
@@ -1234,10 +1236,10 @@ class VocalExtractionView(ft.Container):
         if added_count > 0:
             self._update_file_list()
             snackbar = ft.SnackBar(content=ft.Text(f"已添加 {added_count} 个文件"), bgcolor=ft.Colors.GREEN)
-            self._page.open(snackbar)
+            self._page.show_dialog(snackbar)
         elif skipped_count > 0:
             snackbar = ft.SnackBar(content=ft.Text("人声分离不支持该格式"), bgcolor=ft.Colors.ORANGE)
-            self._page.open(snackbar)
+            self._page.show_dialog(snackbar)
         self._page.update()
     
     def cleanup(self) -> None:

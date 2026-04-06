@@ -153,7 +153,7 @@ class MainView(ft.Column):
             content=ft.Text(message),
             duration=2000,
         )
-        self._page.open(snackbar)
+        self._page.show_dialog(snackbar)
     
     def _build_ui(self) -> None:
         """构建用户界面。"""
@@ -338,9 +338,16 @@ class MainView(ft.Column):
             main_content,
         ]
         
-        # 注意：FAB需要添加到 page.overlay 或 page.floating_action_button
-        # 我们将在初始化完成后添加
-        self._page.floating_action_button = self.fab_search
+        # 通过 overlay 挂载 FAB，避免 Flet 0.84 page.floating_action_button diff bug
+        # (FloatingActionButton 实例无 floating_action_button 属性导致 AttributeError)
+        self.fab_search.bottom = 16
+        self.fab_search.right = 16
+        self._page.overlay.append(self.fab_search)
+        
+        # 共享 FilePicker：Flet 0.84 中 FilePicker 是 Service，需注册到 page.services
+        shared_fp = ft.FilePicker()
+        self._page.services.append(shared_fp)
+        self._page._shared_file_picker = shared_fp
     
     def _get_or_create_image_view(self) -> "ImageView":
         """获取或创建图片视图（懒加载）。"""
@@ -664,6 +671,11 @@ class MainView(ft.Column):
         if not page:
             return
         
+        # 如果当前在设置页，先立即卸载设置层的巨大控件树，
+        # 避免 Flet 自动 page.update() 时序列化整棵设置树导致卡顿
+        if self.settings_layer.visible:
+            self._hide_settings_layer()
+        
         # 如果没有显示推荐页面，所有索引需要偏移
         offset = 0 if self.show_recommendations else -1
         
@@ -770,7 +782,7 @@ class MainView(ft.Column):
             tools.append(tool_info)
         
         search_dialog = ToolSearchDialog(self._page, tools, self.config_service)
-        self._page.open(search_dialog)
+        self._page.show_dialog(search_dialog)
     
     def _on_keyboard(self, e: ft.KeyboardEvent) -> None:
         """键盘事件处理。"""
@@ -780,16 +792,16 @@ class MainView(ft.Column):
     
     def show_search_button(self, update: bool = True) -> None:
         """显示搜索按钮。"""
-        if self.fab_search and self._page:
-            self._page.floating_action_button = self.fab_search
-            if update:
+        if self.fab_search:
+            self.fab_search.visible = True
+            if update and self._page:
                 self._page.update()
     
     def hide_search_button(self, update: bool = True) -> None:
         """隐藏搜索按钮。"""
-        if self._page:
-            self._page.floating_action_button = None
-            if update:
+        if self.fab_search:
+            self.fab_search.visible = False
+            if update and self._page:
                 self._page.update()
     
     def navigate_to_screen_record(self) -> None:
@@ -1062,12 +1074,12 @@ class MainView(ft.Column):
                         ),
                         ft.TextButton(
                             "取消",
-                            on_click=lambda _: self._page.close(admin_dialog),
+                            on_click=lambda _: self._page.pop_dialog(),
                         ),
                     ],
                     actions_alignment=ft.MainAxisAlignment.END,
                 )
-                self._page.open(admin_dialog)
+                self._page.show_dialog(admin_dialog)
                 return
             
             auto_update_btn.disabled = True
@@ -1147,7 +1159,7 @@ class MainView(ft.Column):
         
         def on_manual_download(e):
             """手动下载 - 显示下载选项"""
-            self._page.close(dialog)
+            self._page.pop_dialog()
             
             # 显示下载选项对话框
             download_dialog = ft.AlertDialog(
@@ -1173,27 +1185,27 @@ class MainView(ft.Column):
                 actions_alignment=ft.MainAxisAlignment.END,
             )
             
-            self._page.open(download_dialog)
+            self._page.show_dialog(download_dialog)
         
         def on_skip(e):
             """跳过此版本"""
             self.config_service.set_config_value("skipped_version", update_info.latest_version)
-            self._page.close(dialog)
+            self._page.pop_dialog()
         
         def on_later(e):
             """稍后提醒"""
-            self._page.close(dialog)
+            self._page.pop_dialog()
         
         auto_update_btn.on_click = on_auto_update
         manual_download_btn.on_click = on_manual_download
         skip_btn.on_click = on_skip
         later_btn.on_click = on_later
         
-        self._page.open(dialog)
+        self._page.show_dialog(dialog)
     
     def _open_china_download(self, update_info, dialog):
         """打开国内镜像下载"""
-        self._page.close(dialog)
+        self._page.pop_dialog()
         
         version = update_info.latest_version
         if not version.startswith('v'):
@@ -1203,12 +1215,12 @@ class MainView(ft.Column):
     
     def _open_github_download(self, dialog):
         """打开GitHub下载"""
-        self._page.close(dialog)
+        self._page.pop_dialog()
         webbrowser.open(DOWNLOAD_URL_GITHUB)
     
     def _close_download_dialog(self, dialog):
         """关闭下载对话框"""
-        self._page.close(dialog)
+        self._page.pop_dialog()
     
     def apply_background(self, image_path: Optional[str], fit_mode: Optional[str]) -> None:
         """应用背景图片到主界面。

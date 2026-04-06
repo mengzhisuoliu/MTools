@@ -20,6 +20,7 @@ from constants import (
 )
 from services import ConfigService, ImageService
 from utils import format_file_size, logger, get_unique_path
+from utils.file_utils import pick_files, get_directory_path
 
 
 class ColorSpaceView(ft.Container):
@@ -372,7 +373,8 @@ class ColorSpaceView(ft.Container):
     
     async def _on_select_files(self, e: ft.ControlEvent = None) -> None:
         """打开文件选择对话框。"""
-        result = await ft.FilePicker().pick_files(
+        result = await pick_files(
+            self._page,
             allowed_extensions=[ext.lstrip('.') for ext in self.SUPPORTED_EXTENSIONS],
             allow_multiple=True,
         )
@@ -387,7 +389,7 @@ class ColorSpaceView(ft.Container):
     
     async def _on_select_folder(self, e: ft.ControlEvent) -> None:
         """打开文件夹选择对话框。"""
-        result = await ft.FilePicker().get_directory_path()
+        result = await get_directory_path(self._page)
         
         if result:
             folder = Path(result)
@@ -402,7 +404,7 @@ class ColorSpaceView(ft.Container):
     
     async def _on_select_output_dir(self, e: ft.ControlEvent) -> None:
         """打开输出目录选择对话框。"""
-        result = await ft.FilePicker().get_directory_path()
+        result = await get_directory_path(self._page)
         
         if result:
             self.custom_output_dir.value = result
@@ -523,7 +525,7 @@ class ColorSpaceView(ft.Container):
             content=ft.Text(message),
             bgcolor=bgcolor,
         )
-        self._page.open(snackbar)
+        self._page.show_dialog(snackbar)
     
     def _on_threshold_change(self, e: ft.ControlEvent) -> None:
         """处理二值化阈值变化。"""
@@ -594,7 +596,7 @@ class ColorSpaceView(ft.Container):
                 content=ft.Text(f"颜色空间转换完成！成功: {success_count}, 失败: {error_count}"),
                 bgcolor=ft.Colors.GREEN if error_count == 0 else ft.Colors.ORANGE,
             )
-            self._page.open(snackbar)
+            self._page.show_dialog(snackbar)
         
         # 使用线程池执行
         executor = ThreadPoolExecutor(max_workers=1)
