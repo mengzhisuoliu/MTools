@@ -125,7 +125,7 @@ jobs:
       - name: Install flet-cli
         run: |
           python -m pip install --upgrade pip
-          pip install flet-cli==0.80.5
+          pip install flet-cli==0.84.0
 
       # ========== CUDA 变体处理 ==========
 
@@ -181,7 +181,7 @@ jobs:
 
       - name: Build with Flet
         run: |
-          flet build ${{ matrix.flet_platform }} --verbose --no-rich-output --yes --build-version=${{ steps.version.outputs.build_version }} --build-number=${{ github.run_number }}
+          python flet_build.py ${{ matrix.flet_platform }} --verbose --no-rich-output --yes --build-version=${{ steps.version.outputs.build_version }} --build-number=${{ github.run_number }}
       
       - name: Bundle pywin32 runtime files (Windows)
         if: runner.os == 'Windows'

@@ -69,9 +69,9 @@ def update_pyproject_for_cuda(variant: str) -> None:
             # 在第一个被移除的行位置插入新依赖
             if not ort_cuda_added:
                 if variant == "cuda":
-                    new_lines.append('  "onnxruntime-gpu==1.22.0",')
+                    new_lines.append('  "onnxruntime-gpu==1.24.4",')
                 elif variant == "cuda_full":
-                    new_lines.append('  "onnxruntime-gpu[cuda,cudnn]==1.22.0",')
+                    new_lines.append('  "onnxruntime-gpu[cuda,cudnn]==1.24.4",')
                 ort_cuda_added = True
                 print(f"  已替换 onnxruntime 依赖")
             # 跳过原始行

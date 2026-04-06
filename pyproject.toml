@@ -18,7 +18,8 @@ dependencies = [
   "numpy==1.26.4",
   # ONNX Runtime - 自动根据平台选择合适的版本
   "onnxruntime-directml==1.24.4 ; sys_platform == 'win32'", # Windows DirectML GPU 加速
-  "onnxruntime==1.24.4 ; sys_platform == 'linux' or sys_platform == 'darwin'", # macOS (内置 CoreML) / Linux
+  "onnxruntime==1.24.4 ; sys_platform == 'linux'", # Linux
+  "onnxruntime>=1.22.0 ; sys_platform == 'darwin'", # macOS (1.24.4 无 x86_64 wheel，用 >=1.22 兼容 universal build)
   "websockets==12.0", # 避免弃用警告，等待 flet 更新
   "qrcode[pil]==7.4.2",
   "sherpa-onnx==1.12.35",
@@ -38,8 +39,9 @@ dependencies = [
   "wmi>=1.5.1 ; sys_platform == 'win32'",
   "pyobjc-framework-Cocoa==12.1 ; sys_platform == 'darwin'", # macOS 屏幕区域选择
   "pyobjc-framework-Quartz==12.1 ; sys_platform == 'darwin'",
-  "pynput>=1.7.7 ; sys_platform == 'darwin'",  # macOS 全局热键
-  "flet-dropzone==0.3.1",  # 原生拖放支持（需要 flet build）
+  "pynput>=1.7.7 ; sys_platform == 'darwin'", # macOS 全局热键
+  "flet-dropzone==0.3.1", # 原生拖放支持（需要 flet build）
+  "cryptography>=44.0.0", # 配置加密存储（flet.security 依赖）
 ]
 
 [tool.flet]

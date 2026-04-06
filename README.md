@@ -84,10 +84,10 @@ uv run flet run
 # 使用此方式可完全榨干NVIDIA GPU性能
 # 替换为 GPU 版本（需要 NVIDIA GPU 和 CUDA 环境）
 uv remove onnxruntime-directml onnxruntime
-uv add onnxruntime-gpu==1.22.0
+uv add onnxruntime-gpu==1.24.4
 # 需要免去配置cuda和cudnn环境的话请更改为此依赖
 # 会导致体积增大数倍
-# uv add onnxruntime-gpu[cuda,cudnn]==1.22.0
+# uv add onnxruntime-gpu[cuda,cudnn]==1.24.4
 ```
 
 > 📘 **版本说明**：
@@ -111,10 +111,10 @@ uv add onnxruntime-gpu==1.22.0
 
 | 平台 | 默认版本 | GPU 支持 | 说明 |
 |------|---------|---------|------|
-| **Windows** | `onnxruntime-directml==1.22.0` | ✅ DirectML | 自动支持 Intel/AMD/NVIDIA GPU |
-| **macOS (Apple Silicon)** | `onnxruntime==1.22.0` | ✅ CoreML | 内置硬件加速 |
-| **macOS (Intel)** | `onnxruntime==1.22.0` | ⚠️ CPU | 无 GPU 加速 |
-| **Linux** | `onnxruntime==1.22.0` | ⚠️ CPU | 可选 `onnxruntime-gpu` (CUDA) |
+| **Windows** | `onnxruntime-directml==1.24.4` | ✅ DirectML | 自动支持 Intel/AMD/NVIDIA GPU |
+| **macOS (Apple Silicon)** | `onnxruntime==1.24.4` | ✅ CoreML | 内置硬件加速 |
+| **macOS (Intel)** | `onnxruntime==1.24.4` | ⚠️ CPU | 无 GPU 加速 |
+| **Linux** | `onnxruntime==1.24.4` | ⚠️ CPU | 可选 `onnxruntime-gpu` (CUDA) |
 
 > 💡 **提示**：DirectML 版本不支持限制显存，只有CUDA可限制显存大小
 

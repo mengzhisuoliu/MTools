@@ -30,9 +30,19 @@ from utils import logger
 def _is_packaged_app() -> bool:
     """判断当前是否为打包后的应用程序。
     
+    支持 Nuitka 打包（sys.frozen）和 flet build（serious_python 嵌入式环境）。
+    
     Returns:
         True 表示是打包后的应用，False 表示是开发环境
     """
+    # Nuitka / PyInstaller 等打包工具设置 sys.frozen
+    if getattr(sys, 'frozen', False):
+        return True
+    
+    # flet build 使用 serious_python 嵌入 Python，会设置此环境变量
+    if os.environ.get("SERIOUS_PYTHON_SITE_PACKAGES"):
+        return True
+    
     exe_name = os.path.basename(sys.executable).lower()
     
     # Windows: 检查是否为 .exe 且不是 python.exe
@@ -189,6 +199,59 @@ class AutoUpdater:
         except Exception as e:
             raise Exception(f"应用更新失败: {str(e)}")
     
+    @staticmethod
+    def _find_main_exe(search_dir: Path, expected_name: str) -> Optional[Path]:
+        """在解压目录中查找主程序 exe。
+
+        优先按名称精确匹配（不区分大小写），避免把 app_packages 里
+        第三方包附带的 .exe 误认为主程序。找不到精确匹配时回退到
+        顶层目录中的第一个 .exe。
+        """
+        expected_lower = expected_name.lower()
+
+        # 1) 精确名称匹配
+        for exe in search_dir.rglob("*.exe"):
+            if exe.name.lower() == expected_lower:
+                return exe
+
+        # 2) 回退：只在顶层或一级子目录中找 .exe（跳过 app_packages 等深层目录）
+        for exe in search_dir.glob("*.exe"):
+            return exe
+        for child in search_dir.iterdir():
+            if child.is_dir():
+                for exe in child.glob("*.exe"):
+                    return exe
+
+        return None
+
+    @staticmethod
+    def _find_unix_main_exe(search_dir: Path, expected_name: str) -> Optional[Path]:
+        """在解压目录中查找 Unix 主程序可执行文件。
+
+        优先按名称精确匹配，然后回退到顶层 / 一级子目录中的可执行文件，
+        跳过 app_packages 等深层目录。
+        """
+        expected_lower = expected_name.lower()
+
+        # 1) 按名称精确匹配
+        for f in search_dir.rglob("*"):
+            if f.is_file() and f.name.lower() == expected_lower and os.access(f, os.X_OK):
+                return f
+
+        # 2) 回退：顶层可执行文件
+        for f in search_dir.iterdir():
+            if f.is_file() and os.access(f, os.X_OK) and not f.name.startswith('.'):
+                return f
+
+        # 3) 回退：一级子目录中的可执行文件
+        for child in search_dir.iterdir():
+            if child.is_dir():
+                for f in child.iterdir():
+                    if f.is_file() and os.access(f, os.X_OK) and not f.name.startswith('.'):
+                        return f
+
+        return None
+
     def _create_windows_update_script(self, source_dir: Path, target_dir: Path, exit_callback: Optional[Callable[[], None]] = None) -> None:
         """创建 Windows 更新脚本。
         
@@ -199,50 +262,23 @@ class AutoUpdater:
         """
         script_path = source_dir.parent / "update.bat"
         
-        # 查找解压后的实际文件夹（可能有嵌套）
-        update_files = list(source_dir.rglob("*.exe"))
+        # 定位主程序 exe 和实际源目录
+        # flet build 产物的 app_packages/ 下可能包含第三方 .exe，
+        # 因此优先按名称精确匹配，避免误选。
+        expected_name = Path(sys.executable).name if _is_packaged_app() else "MTools.exe"
         
-        if not update_files:
-            # 如果没找到 exe，说明可能是嵌套目录结构
-            # 尝试在子目录中查找
-            subdirs = [d for d in source_dir.iterdir() if d.is_dir()]
-            if subdirs:
-                # 可能解压后有嵌套目录，如 MTools_Windows_amd64/
-                for subdir in subdirs:
-                    update_files = list(subdir.rglob("*.exe"))
-                    if update_files:
-                        break
+        main_exe = self._find_main_exe(source_dir, expected_name)
         
-        if update_files:
-            # 找到主程序 exe 的实际所在目录（包含所有需要的文件）
-            main_exe = update_files[0]
-            
-            # 向上查找，直到找到包含所有必要文件的根目录
-            # 通常是包含 .exe、assets、data 等的目录
+        if main_exe:
             actual_source = main_exe.parent
-            
-            # 检查是否还有父目录只包含这一个子目录（说明是嵌套结构）
-            # 如果父目录只有一个子目录，那么实际源就是这个子目录，而不是父目录
-            parent = actual_source.parent
-            if parent != source_dir:
-                # 如果父目录就是 source_dir，检查 source_dir 是否只有一个子目录
-                if parent == source_dir and len(list(source_dir.iterdir())) == 1:
-                    # source_dir 只有一个子目录，说明是嵌套的，使用子目录
-                    pass  # actual_source 已经是正确的
-                elif len(list(parent.iterdir())) == 1:
-                    # 父目录只有一个子目录，说明 actual_source 是正确的
-                    pass
-            
             if not _is_packaged_app():
                 logger.debug(f"找到更新程序: {main_exe}")
                 logger.debug(f"实际源目录: {actual_source}")
         else:
             actual_source = source_dir
-            # 尝试找到主程序（根据当前运行的程序名）
-            exe_name = Path(sys.executable).name if _is_packaged_app() else "MTools.exe"
-            main_exe = target_dir / exe_name
+            main_exe = target_dir / expected_name
             if not _is_packaged_app():
-                logger.warning(f"未在更新包中找到 exe 文件，使用默认: {exe_name}")
+                logger.warning(f"未在更新包中找到 exe 文件，使用默认: {expected_name}")
         
         # 获取所有需要终止的进程名
         # 对于 Flet 应用，需要同时终止主程序和 flet.exe
@@ -484,15 +520,16 @@ exit /b 0
         """
         script_path = source_dir.parent / "update.sh"
         
-        # 查找解压后的实际文件夹（可能有嵌套）
-        update_files = list(source_dir.rglob("*"))
-        executables = [f for f in update_files if f.is_file() and os.access(f, os.X_OK)]
-        if executables:
-            actual_source = executables[0].parent
-            main_exe = executables[0]
+        # 定位主程序可执行文件
+        # 优先在顶层 / 一级子目录中查找，避免误选 app_packages 里的脚本
+        expected_name = Path(sys.executable).name if _is_packaged_app() else "MTools"
+        main_exe = self._find_unix_main_exe(source_dir, expected_name)
+        
+        if main_exe:
+            actual_source = main_exe.parent
         else:
             actual_source = source_dir
-            main_exe = target_dir / "main"
+            main_exe = target_dir / expected_name
         
         # 获取当前进程名
         if HAS_PSUTIL:
@@ -518,10 +555,10 @@ pkill -9 -f "{process_name}" || true
 sleep 2
 
 echo "[3/4] 安装新版本..."
-REM 删除旧文件
+# 删除旧文件
 rm -rf "{target_dir}"/* 2>/dev/null || true
 
-REM 复制新版本文件
+# 复制新版本文件
 cp -rf "{actual_source}"/* "{target_dir}/" || {{
     echo "错误：复制文件失败！更新中止。"
     echo "请手动下载更新包并解压到应用目录。"

@@ -2,12 +2,17 @@
 """配置服务模块。
 
 提供应用配置管理，包括数据目录设置、用户偏好设置等。
+配置以加密形式存储（Fernet / AES-128），密钥基于机器特征自动派生。
 """
 
+import getpass
+import hashlib
 import json
 import platform
 from pathlib import Path
 from typing import Any, Dict, Optional
+
+from flet.security import encrypt, decrypt
 
 
 class ConfigService:
@@ -17,13 +22,29 @@ class ConfigService:
     - 数据存储目录管理
     - 用户设置保存和读取
     - 跨平台目录规范支持
+    - 配置加密存储（对外接口透明）
     """
+
+    _CONFIG_FILENAME = "config.dat"
+    _LEGACY_FILENAME = "config.json"
     
     def __init__(self) -> None:
         """初始化配置服务。"""
-        self.config_file: Path = self._get_config_file_path()
+        self._secret_key: str = self._derive_secret_key()
+        self._config_dir: Path = self._get_config_dir()
+        self._config_dir.mkdir(parents=True, exist_ok=True)
+        self.config_file: Path = self._config_dir / self._CONFIG_FILENAME
         self.config: Dict[str, Any] = self._load_config()
     
+    @staticmethod
+    def _derive_secret_key() -> str:
+        """基于机器特征派生加密密钥。
+
+        同一台机器、同一用户始终得到相同密钥，无需用户手动配置。
+        """
+        raw = f"MTools:{getpass.getuser()}@{platform.node()}"
+        return hashlib.sha256(raw.encode()).hexdigest()
+
     def _get_default_data_dir(self) -> Path:
         """获取默认数据目录（遵循平台规范）。
         
@@ -34,57 +55,85 @@ class ConfigService:
         app_name: str = "MTools"
         
         if system == "Windows":
-            # Windows: %APPDATA%\MTools
             base_dir: Path = Path.home() / "AppData" / "Roaming"
         elif system == "Darwin":
-            # macOS: ~/Library/Application Support/MTools
             base_dir = Path.home() / "Library" / "Application Support"
         else:
-            # Linux: ~/.local/share/MTools
             base_dir = Path.home() / ".local" / "share"
         
         data_dir: Path = base_dir / app_name
         return data_dir
     
-    def _get_config_file_path(self) -> Path:
-        """获取配置文件路径（遵循平台规范）。
-        
-        Returns:
-            配置文件路径
-        """
+    @staticmethod
+    def _get_config_dir() -> Path:
+        """获取配置文件所在目录（遵循平台规范）。"""
         system: str = platform.system()
         app_name: str = "MTools"
         
         if system == "Windows":
-            # Windows: %APPDATA%\MTools\config.json
-            config_dir: Path = Path.home() / "AppData" / "Roaming" / app_name
+            return Path.home() / "AppData" / "Roaming" / app_name
         elif system == "Darwin":
-            # macOS: ~/Library/Application Support/MTools/config.json
-            config_dir = Path.home() / "Library" / "Application Support" / app_name
+            return Path.home() / "Library" / "Application Support" / app_name
         else:
-            # Linux: ~/.config/MTools/config.json
-            config_dir = Path.home() / ".config" / app_name
-        
-        # 确保目录存在
-        config_dir.mkdir(parents=True, exist_ok=True)
-        
-        return config_dir / "config.json"
-    
+            return Path.home() / ".config" / app_name
+
+    # ------------------------------------------------------------------
+    # 加密读写
+    # ------------------------------------------------------------------
+
+    def _encrypt_and_write(self, data: Dict[str, Any], path: Path) -> None:
+        """将配置字典加密后写入文件。"""
+        json_str = json.dumps(data, ensure_ascii=False, indent=2)
+        encrypted = encrypt(json_str, self._secret_key)
+        path.write_text(encrypted, encoding="utf-8")
+
+    def _read_and_decrypt(self, path: Path) -> Dict[str, Any]:
+        """从加密文件读取并解密为配置字典。
+
+        Raises:
+            Exception: 解密或 JSON 解析失败
+        """
+        encrypted = path.read_text(encoding="utf-8").strip()
+        json_str = decrypt(encrypted, self._secret_key)
+        return json.loads(json_str)
+
+    # ------------------------------------------------------------------
+    # 配置加载（含旧版明文迁移）
+    # ------------------------------------------------------------------
+
     def _load_config(self) -> Dict[str, Any]:
         """加载配置文件。
-        
-        Returns:
-            配置字典
+
+        优先读取加密的 config.dat；若不存在则尝试迁移旧版明文 config.json。
         """
+        legacy_file = self._config_dir / self._LEGACY_FILENAME
+
+        # 1) 优先读取加密配置
         if self.config_file.exists():
             try:
-                with open(self.config_file, "r", encoding="utf-8") as f:
-                    config: Dict[str, Any] = json.load(f)
-                    return config
-            except Exception as e:
+                return self._read_and_decrypt(self.config_file)
+            except Exception:
+                # 解密失败（密钥变化等），回退到默认配置
                 return self._get_default_config()
-        else:
-            return self._get_default_config()
+
+        # 2) 尝试迁移旧版明文 config.json
+        if legacy_file.exists():
+            try:
+                with open(legacy_file, "r", encoding="utf-8") as f:
+                    config: Dict[str, Any] = json.load(f)
+                # 迁移：写入加密格式
+                self._encrypt_and_write(config, self.config_file)
+                # 迁移成功后删除明文文件
+                try:
+                    legacy_file.unlink()
+                except Exception:
+                    pass
+                return config
+            except Exception:
+                return self._get_default_config()
+
+        # 3) 全新安装
+        return self._get_default_config()
     
     def _get_default_config(self) -> Dict[str, Any]:
         """获取默认配置。
@@ -97,39 +146,64 @@ class ConfigService:
             "use_custom_dir": False,
             "theme_mode": "system",  # system, light, dark
             "language": "zh_CN",
-            "font_family": "System",  # 默认系统字体
-            "font_scale": 1.0,  # 字体缩放比例，1.0为默认大小
-            "window_left": None,   # 窗口左边距，None表示居中
-            "window_top": None,    # 窗口上边距，None表示居中
-            "window_width": None,  # 窗口宽度，None表示使用默认值
-            "window_height": None, # 窗口高度，None表示使用默认值
-            "window_maximized": False,  # 窗口是否最大化
-            "window_opacity": 1.0,  # 窗口透明度，1.0为完全不透明，0.0为完全透明
-            "background_image": None,  # 背景图片路径，None表示无背景图片
-            "background_image_fit": "cover",  # 背景图片适应模式: cover, contain, fill, none
-            "gpu_acceleration": platform.system() != "Darwin",  # GPU加速开关，macOS默认关闭（CoreML可能导致界面卡死）
-            "gpu_memory_limit": 8192,  # GPU内存限制（MB），默认8192MB
-            "gpu_device_id": 0,  # GPU设备ID，默认使用第一个GPU（0）
-            "gpu_enable_memory_arena": False,  # 是否启用GPU内存池优化，默认开启
-            # ONNX Runtime 性能优化参数
-            "onnx_cpu_threads": 0,  # CPU推理线程数，0=自动检测
-            "onnx_execution_mode": "sequential",  # 执行模式: sequential(顺序,省内存) 或 parallel(并行,多核快)
-            "onnx_enable_model_cache": False,  # 是否缓存优化后的模型，加速二次启动
+            "font_family": "System",
+            "font_scale": 1.0,
+            "window_left": None,
+            "window_top": None,
+            "window_width": None,
+            "window_height": None,
+            "window_maximized": False,
+            "window_opacity": 1.0,
+            "background_image": None,
+            "background_image_fit": "cover",
+            "gpu_acceleration": platform.system() != "Darwin",
+            "gpu_memory_limit": 8192,
+            "gpu_device_id": 0,
+            "gpu_enable_memory_arena": False,
+            "onnx_cpu_threads": 0,
+            "onnx_execution_mode": "sequential",
+            "onnx_enable_model_cache": False,
         }
     
     def save_config(self) -> bool:
-        """保存配置到文件。
+        """保存配置到加密文件。
         
         Returns:
             是否保存成功
         """
         try:
-            with open(self.config_file, "w", encoding="utf-8") as f:
-                json.dump(self.config, f, ensure_ascii=False, indent=2)
+            self._encrypt_and_write(self.config, self.config_file)
             return True
-        except Exception as e:
+        except Exception:
             return False
     
+    # ------------------------------------------------------------------
+    # 导入 / 导出（明文 JSON，供设置界面使用）
+    # ------------------------------------------------------------------
+
+    def export_config(self, path: Path) -> bool:
+        """将当前配置导出为明文 JSON 文件。"""
+        try:
+            with open(path, "w", encoding="utf-8") as f:
+                json.dump(self.config, f, ensure_ascii=False, indent=2)
+            return True
+        except Exception:
+            return False
+
+    def import_config(self, path: Path) -> bool:
+        """从明文 JSON 文件导入配置并加密保存。"""
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                config: Dict[str, Any] = json.load(f)
+            self.config = config
+            return self.save_config()
+        except Exception:
+            return False
+
+    # ------------------------------------------------------------------
+    # 公共接口（与旧版完全兼容）
+    # ------------------------------------------------------------------
+
     def get_data_dir(self) -> Path:
         """获取数据目录。
         
@@ -138,10 +212,7 @@ class ConfigService:
         """
         data_dir_str: str = self.config.get("data_dir", str(self._get_default_data_dir()))
         data_dir: Path = Path(data_dir_str)
-        
-        # 确保目录存在
         data_dir.mkdir(parents=True, exist_ok=True)
-        
         return data_dir
     
     def set_data_dir(self, path: str, is_custom: bool = True) -> bool:
@@ -156,14 +227,13 @@ class ConfigService:
         """
         try:
             data_dir: Path = Path(path)
-            # 验证路径
             if not data_dir.exists():
                 data_dir.mkdir(parents=True, exist_ok=True)
             
             self.config["data_dir"] = str(data_dir)
             self.config["use_custom_dir"] = is_custom
             return self.save_config()
-        except Exception as e:
+        except Exception:
             return False
     
     def check_data_exists(self, directory: Path = None) -> bool:
@@ -181,10 +251,8 @@ class ConfigService:
         if not directory.exists():
             return False
         
-        # 检查是否有子目录或文件（排除临时文件）
         try:
             items = list(directory.iterdir())
-            # 过滤掉隐藏文件和临时文件
             significant_items = [
                 item for item in items 
                 if not item.name.startswith('.') and item.name != 'temp'
@@ -210,16 +278,13 @@ class ConfigService:
             if not source_dir.exists():
                 return False, "源目录不存在"
             
-            # 确保目标目录存在
             dest_dir.mkdir(parents=True, exist_ok=True)
             
-            # 获取所有要迁移的项目（排除 config.json）
-            items = []
-            for item in source_dir.iterdir():
-                # 跳过 config.json，保留在原目录
-                if item.name == "config.json":
-                    continue
-                items.append(item)
+            skip_names = {self._CONFIG_FILENAME, self._LEGACY_FILENAME}
+            items = [
+                item for item in source_dir.iterdir()
+                if item.name not in skip_names
+            ]
             
             total_items = len(items)
             
@@ -236,16 +301,14 @@ class ConfigService:
                         progress_callback(i, total_items, f"正在迁移: {item.name}")
                     
                     if item.is_dir():
-                        # 复制目录
                         if dest_item.exists():
                             shutil.rmtree(dest_item)
                         shutil.copytree(item, dest_item)
                     else:
-                        # 复制文件
                         shutil.copy2(item, dest_item)
                     
                     migrated_count += 1
-                except Exception as e:
+                except Exception:
                     continue
             
             if progress_callback:
@@ -308,7 +371,6 @@ class ConfigService:
         
         tool_usage_count[tool_name] += 1
         
-        # 保存
         self.set_config_value("tool_usage_count", tool_usage_count)
     
     def get_pinned_tools(self) -> list:
@@ -327,7 +389,7 @@ class ConfigService:
         """
         pinned = self.get_pinned_tools()
         if tool_id not in pinned:
-            pinned.insert(0, tool_id)  # 新置顶的放在最前面
+            pinned.insert(0, tool_id)
             self.set_config_value("pinned_tools", pinned)
     
     def unpin_tool(self, tool_id: str) -> None:
@@ -371,4 +433,3 @@ class ConfigService:
         output_dir: Path = self.get_data_dir() / "output"
         output_dir.mkdir(parents=True, exist_ok=True)
         return output_dir
-

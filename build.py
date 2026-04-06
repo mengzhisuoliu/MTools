@@ -335,9 +335,9 @@ def check_onnxruntime_version():
     """检查 onnxruntime 版本并给出建议
     
     支持的版本（所有平台都接受以下任一版本）：
-    - onnxruntime==1.22.0 (Windows/macOS/Linux CPU，macOS Apple Silicon 内置 CoreML 加速)
-    - onnxruntime-gpu==1.22.0 (Linux/Windows NVIDIA CUDA加速)
-    - onnxruntime-directml==1.22.0 (Windows DirectML加速，推荐)
+    - onnxruntime==1.24.4 (Windows/macOS/Linux CPU，macOS Apple Silicon 内置 CoreML 加速)
+    - onnxruntime-gpu==1.24.4 (Linux/Windows NVIDIA CUDA加速)
+    - onnxruntime-directml==1.24.4 (Windows DirectML加速，推荐)
     
     注意：仅显示提示信息，不会阻断构建过程
     
@@ -401,8 +401,8 @@ def check_onnxruntime_version():
         print(f"📦 ONNX Runtime: {installed_variant} {installed_version}")
         
         # 检查版本号
-        if installed_version != "1.22.0":
-            print(f"   ⚠️  推荐版本: 1.22.0（当前: {installed_version}）")
+        if installed_version != "1.24.4":
+            print(f"   ⚠️  推荐版本: 1.24.4（当前: {installed_version}）")
             print("   ⚠️  使用非推荐版本可能导致兼容性问题")
         
         # 根据平台给出建议
@@ -416,10 +416,10 @@ def check_onnxruntime_version():
                 print("   💡 提示：Windows 推荐使用 onnxruntime-directml（兼容性更好）")
             elif installed_variant == "onnxruntime":
                 print("   ℹ️  使用 CPU 版本")
-                print("   💡 推荐：uv add onnxruntime-directml==1.22.0（启用 GPU 加速）")
+                print("   💡 推荐：uv add onnxruntime-directml==1.24.4（启用 GPU 加速）")
             else:
                 print(f"   ⚠️  {installed_variant} 在 Windows 上可能不受支持")
-                print("   💡 推荐：uv add onnxruntime-directml==1.22.0")
+                print("   💡 推荐：uv add onnxruntime-directml==1.24.4")
         
         elif system == "Darwin":
             if installed_variant == "onnxruntime":
@@ -429,27 +429,27 @@ def check_onnxruntime_version():
                     print("   ℹ️  使用 CPU 版本（Intel Mac）")
             elif installed_variant == "onnxruntime-silicon":
                 print("   ⚠️  onnxruntime-silicon 已被弃用")
-                print("   💡 推荐：uv remove onnxruntime-silicon && uv add onnxruntime==1.22.0")
+                print("   💡 推荐：uv remove onnxruntime-silicon && uv add onnxruntime==1.24.4")
                 print("   ℹ️  说明：新版 onnxruntime 已内置 CoreML 支持，无需单独安装 silicon 版本")
             elif installed_variant == "onnxruntime-gpu":
                 print("   ⚠️  macOS 不支持 CUDA")
-                print("   💡 推荐：uv remove onnxruntime-gpu && uv add onnxruntime==1.22.0")
+                print("   💡 推荐：uv remove onnxruntime-gpu && uv add onnxruntime==1.24.4")
             elif installed_variant == "onnxruntime-directml":
                 print("   ⚠️  macOS 不支持 DirectML")
-                print("   💡 推荐：uv remove onnxruntime-directml && uv add onnxruntime==1.22.0")
+                print("   💡 推荐：uv remove onnxruntime-directml && uv add onnxruntime==1.24.4")
         
         elif system == "Linux":
             if installed_variant == "onnxruntime-gpu":
                 print("   ✅ 使用 CUDA 加速版本（需要 NVIDIA GPU、CUDA Toolkit 和 cuDNN）")
             elif installed_variant == "onnxruntime":
                 print("   ℹ️  使用 CPU 版本")
-                print("   💡 提示：如有 NVIDIA GPU，可使用 onnxruntime-gpu==1.22.0（需配置 CUDA）")
+                print("   💡 提示：如有 NVIDIA GPU，可使用 onnxruntime-gpu==1.24.4（需配置 CUDA）")
             elif installed_variant == "onnxruntime-directml":
                 print("   ⚠️  Linux 不支持 DirectML")
-                print("   💡 推荐：uv remove onnxruntime-directml && uv add onnxruntime==1.22.0")
+                print("   💡 推荐：uv remove onnxruntime-directml && uv add onnxruntime==1.24.4")
             elif installed_variant == "onnxruntime-silicon":
                 print("   ⚠️  onnxruntime-silicon 已被弃用且不支持 Linux")
-                print("   💡 推荐：uv remove onnxruntime-silicon && uv add onnxruntime==1.22.0")
+                print("   💡 推荐：uv remove onnxruntime-silicon && uv add onnxruntime==1.24.4")
         
         return True
         
@@ -1042,8 +1042,8 @@ def get_nuitka_cmd(mode="release", enable_upx=False, upx_path=None, jobs=2, flet
             
             if not nvidia_found:
                 print("   ⚠️  警告: 未找到 NVIDIA 库，CUDA FULL 版本可能无法正常运行")
-                print("      请确保已安装: uv add 'onnxruntime-gpu[cuda,cudnn]==1.22.0'")
-                print("      或: pip install 'onnxruntime-gpu[cuda,cudnn]==1.22.0'")
+                print("      请确保已安装: uv add 'onnxruntime-gpu[cuda,cudnn]==1.24.4'")
+                print("      或: pip install 'onnxruntime-gpu[cuda,cudnn]==1.24.4'")
         except Exception as e:
             print(f"   ⚠️  检查 NVIDIA 库时出错: {e}")
             import traceback
@@ -1118,7 +1118,7 @@ def cleanup_sherpa_onnx_libs():
     """清理 sherpa-onnx 自带的 onnxruntime 库文件
     
     sherpa-onnx 包自带了旧版本的 onnxruntime 动态库（1.17.1），
-    与系统安装的新版本（1.22.0）冲突，导致 Nuitka 打包时出现路径解析错误。
+    与系统安装的新版本（1.24.4）冲突，导致 Nuitka 打包时出现路径解析错误。
     
     macOS 上的特殊问题：
     - sherpa_onnx/lib 目录包含 libonnxruntime.1.17.1.dylib 等文件
