@@ -20,9 +20,6 @@ dev = [
 
 [project.urls]
 Homepage = "https://mydomain.dev"
-Documentation = "https://github.com/MyGithubAccount/flet-gpt-markdown"
-Repository = "https://github.com/MyGithubAccount/flet-gpt-markdown"
-Issues = "https://github.com/MyGithubAccount/flet-gpt-markdown/issues"
 
 [tool.setuptools.package-data]
 "flutter.flet_gpt_markdown" = ["**/*"]
