@@ -169,15 +169,11 @@ jobs:
 
       # ========== Flet Build ==========
 
-      # 移除不兼容的图标文件，确保 flet build 使用 icon.png
-      - name: Remove incompatible icon files (Windows/Linux)
-        if: runner.os != 'macOS'
+      # 移除平台专用图标，强制 flet build 使用高分辨率 icon.png (1024x1024)
+      # flutter_launcher_icons 从 PNG 生成各平台所需的全部尺寸，效果最佳
+      - name: Remove platform-specific icon files
         shell: bash
-        run: rm -f src/assets/icon.icns
-
-      - name: Remove incompatible icon files (macOS)
-        if: runner.os == 'macOS'
-        run: rm -f src/assets/icon.ico
+        run: rm -f src/assets/icon.icns src/assets/icon.ico
 
       - name: Build with Flet
         run: |
