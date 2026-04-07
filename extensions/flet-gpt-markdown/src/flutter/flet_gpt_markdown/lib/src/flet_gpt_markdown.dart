@@ -93,7 +93,7 @@ class FletGptMarkdownControl extends StatelessWidget {
     };
 
     Widget mdWidget = GptMarkdownTheme(
-      data: mdThemeData,
+      gptThemeData: mdThemeData,
       child: GptMarkdown(
         text,
         style: theme.textTheme.bodyMedium?.copyWith(
