@@ -105,15 +105,20 @@ class ConfigService:
         """加载配置文件。
 
         优先读取加密的 config.dat；若不存在则尝试迁移旧版明文 config.json。
+        解密失败时会尝试从明文备份恢复。
         """
         legacy_file = self._config_dir / self._LEGACY_FILENAME
+        backup_file = self._config_dir / "config.json.bak"
 
         # 1) 优先读取加密配置
         if self.config_file.exists():
             try:
                 return self._read_and_decrypt(self.config_file)
             except Exception:
-                # 解密失败（密钥变化等），回退到默认配置
+                # 解密失败（密钥变化等），尝试从明文备份恢复
+                fallback = self._try_load_legacy(legacy_file, backup_file)
+                if fallback is not None:
+                    return fallback
                 return self._get_default_config()
 
         # 2) 尝试迁移旧版明文 config.json
@@ -121,11 +126,10 @@ class ConfigService:
             try:
                 with open(legacy_file, "r", encoding="utf-8") as f:
                     config: Dict[str, Any] = json.load(f)
-                # 迁移：写入加密格式
                 self._encrypt_and_write(config, self.config_file)
-                # 迁移成功后删除明文文件
+                # 保留明文备份而非删除，便于回退
                 try:
-                    legacy_file.unlink()
+                    legacy_file.rename(backup_file)
                 except Exception:
                     pass
                 return config
@@ -134,6 +138,20 @@ class ConfigService:
 
         # 3) 全新安装
         return self._get_default_config()
+
+    def _try_load_legacy(self, *paths: Path) -> Dict[str, Any] | None:
+        """尝试从明文 JSON 文件恢复配置，成功后重新加密保存。"""
+        for path in paths:
+            if not path.exists():
+                continue
+            try:
+                with open(path, "r", encoding="utf-8") as f:
+                    config: Dict[str, Any] = json.load(f)
+                self._encrypt_and_write(config, self.config_file)
+                return config
+            except Exception:
+                continue
+        return None
     
     def _get_default_config(self) -> Dict[str, Any]:
         """获取默认配置。

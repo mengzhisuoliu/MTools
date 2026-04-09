@@ -13,7 +13,7 @@ import sys
 import platform
 import webbrowser
 from utils import logger
-from utils.file_utils import get_system_fonts, pick_files, get_directory_path
+from utils.file_utils import get_system_fonts, pick_files, get_directory_path, save_file
 
 import flet as ft
 import httpx
@@ -1053,6 +1053,28 @@ class SettingsView(ft.Container):
             color=ft.Colors.ON_SURFACE_VARIANT,
         )
         
+        config_backup_row = ft.Row(
+            controls=[
+                ft.OutlinedButton(
+                    content="导出配置",
+                    icon=ft.Icons.UPLOAD_FILE,
+                    on_click=self._on_export_config,
+                ),
+                ft.OutlinedButton(
+                    content="导入配置",
+                    icon=ft.Icons.DOWNLOAD,
+                    on_click=self._on_import_config,
+                ),
+            ],
+            spacing=PADDING_MEDIUM,
+        )
+
+        config_backup_info = ft.Text(
+            "导出为明文 JSON 文件，可用于备份或迁移到其他设备。",
+            size=12,
+            color=ft.Colors.ON_SURFACE_VARIANT,
+        )
+
         # 组装数据目录部分
         return ft.Container(
             content=ft.Column(
@@ -1066,6 +1088,12 @@ class SettingsView(ft.Container):
                     button_row,
                     ft.Container(height=PADDING_MEDIUM // 2),
                     info_text,
+                    ft.Divider(height=PADDING_LARGE, color=ft.Colors.OUTLINE_VARIANT),
+                    ft.Text("配置备份", size=16, weight=ft.FontWeight.W_600),
+                    ft.Container(height=PADDING_MEDIUM // 2),
+                    config_backup_row,
+                    ft.Container(height=PADDING_MEDIUM // 2),
+                    config_backup_info,
                 ],
                 spacing=0,
             ),
@@ -4180,11 +4208,12 @@ class SettingsView(ft.Container):
                         self._show_snackbar("旧目录不存在", ft.Colors.ORANGE)
                         return
                     
-                    # 删除旧数据目录中的内容，但保留 config.json
+                    # 删除旧数据目录中的内容，但保留配置文件
+                    _config_keep = {"config.json", "config.json.bak", "config.dat"}
                     def _do_delete():
                         count = 0
                         for item in old_dir.iterdir():
-                            if item.name == "config.json":
+                            if item.name in _config_keep:
                                 continue
                             try:
                                 if item.is_dir():
@@ -4199,7 +4228,7 @@ class SettingsView(ft.Container):
                     deleted_count = await asyncio.to_thread(_do_delete)
                     
                     if deleted_count > 0:
-                        self._show_snackbar(f"已删除 {deleted_count} 项旧数据（保留了 config.json）", ft.Colors.GREEN)
+                        self._show_snackbar(f"已删除 {deleted_count} 项旧数据（保留了配置文件）", ft.Colors.GREEN)
                     else:
                         self._show_snackbar("没有需要删除的数据", ft.Colors.ORANGE)
                 except Exception as e:
@@ -4243,7 +4272,7 @@ class SettingsView(ft.Container):
                             controls=[
                                 ft.Icon(ft.Icons.INFO_OUTLINE, size=16, color=ft.Colors.BLUE),
                                 ft.Text(
-                                    "将保留 config.json 配置文件",
+                                    "将保留配置文件",
                                     size=12,
                                     color=ft.Colors.ON_SURFACE_VARIANT,
                                 ),
@@ -4283,6 +4312,43 @@ class SettingsView(ft.Container):
         
         self._page.show_dialog(dialog)
     
+    def _on_export_config(self, e: ft.ControlEvent) -> None:
+        """导出配置为明文 JSON 文件。"""
+        async def _do_export():
+            result = await save_file(
+                self._page,
+                dialog_title="导出配置文件",
+                file_name="mtools_config.json",
+                allowed_extensions=["json"],
+            )
+            if not result:
+                return
+            path = Path(result)
+            if self.config_service.export_config(path):
+                self._show_snackbar(f"配置已导出到 {path.name}", ft.Colors.GREEN)
+            else:
+                self._show_snackbar("导出失败", ft.Colors.RED)
+
+        self._page.run_task(_do_export)
+
+    def _on_import_config(self, e: ft.ControlEvent) -> None:
+        """从明文 JSON 文件导入配置。"""
+        async def _do_import():
+            result = await pick_files(
+                self._page,
+                dialog_title="选择配置文件",
+                allowed_extensions=["json"],
+            )
+            if not result or not result.files:
+                return
+            path = Path(result.files[0].path)
+            if self.config_service.import_config(path):
+                self._show_snackbar("配置已导入，部分设置需重启后生效", ft.Colors.GREEN)
+            else:
+                self._show_snackbar("导入失败，请检查文件格式", ft.Colors.RED)
+
+        self._page.run_task(_do_import)
+
     def _on_open_dir_click(self, e: ft.ControlEvent) -> None:
         """打开目录按钮点击事件处理。
         
