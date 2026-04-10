@@ -845,7 +845,8 @@ class CustomTitleBar(ft.Container):
         # 异步销毁 Flutter 窗口（窗口关闭后 Flet 会自行结束进程）
         async def _do_destroy():
             try:
-                await page.window.destroy()
+                # await page.window.destroy()
+                await page.window.close()
             except Exception:
                 os._exit(0)
         page.run_task(_do_destroy)

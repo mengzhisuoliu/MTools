@@ -208,12 +208,20 @@ class ConfigService:
         except Exception:
             return False
 
+    _LOCAL_ONLY_KEYS = {"data_dir", "use_custom_dir"}
+
     def import_config(self, path: Path) -> bool:
-        """从明文 JSON 文件导入配置并加密保存。"""
+        """从明文 JSON 文件导入配置并加密保存。
+
+        数据存储路径等本机相关设置不会被覆盖。
+        """
         try:
             with open(path, "r", encoding="utf-8") as f:
-                config: Dict[str, Any] = json.load(f)
-            self.config = config
+                imported: Dict[str, Any] = json.load(f)
+            for key in self._LOCAL_ONLY_KEYS:
+                if key in self.config:
+                    imported[key] = self.config[key]
+            self.config = imported
             return self.save_config()
         except Exception:
             return False

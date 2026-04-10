@@ -207,6 +207,7 @@ class MainView(ft.Column):
             expand=True,
             destinations=destinations,
             on_change=self._on_navigation_change,
+            bgcolor=ft.Colors.TRANSPARENT,
         )
         
         # 保存是否显示推荐页面的状态
@@ -240,7 +241,7 @@ class MainView(ft.Column):
         # 导航栏容器（添加阴影效果，背景半透明以显示背景图）
         self.navigation_container: ft.Container = ft.Container(
             content=navigation_column,
-            bgcolor=ft.Colors.with_opacity(0.85, ft.Colors.SURFACE),  # 半透明背景
+            bgcolor=ft.Colors.with_opacity(1.0, ft.Colors.SURFACE),
             shadow=ft.BoxShadow(
                 spread_radius=0,
                 blur_radius=10,
@@ -311,7 +312,11 @@ class MainView(ft.Column):
             ],
             expand=True,
         )
-        content_area = self.content_stack
+        self.content_bg = ft.Container(
+            content=self.content_stack,
+            expand=True,
+        )
+        content_area = self.content_bg
         
         # 主内容区域（导航栏 + 内容）
         main_content: ft.Row = ft.Row(
@@ -1222,15 +1227,55 @@ class MainView(ft.Column):
         """关闭下载对话框"""
         self._page.pop_dialog()
     
+    def _apply_bg_opacity_from_config(self) -> None:
+        """根据配置更新标题栏、导航栏、内容区的透明度。"""
+        has_bg = hasattr(self, '_bg_wrapper')
+        cs = self.config_service
+
+        if has_bg:
+            if cs.get_config_value("bg_titlebar_transparent", True):
+                t_op = cs.get_config_value("bg_titlebar_opacity", 0.45)
+            else:
+                t_op = 0.95
+            self.title_bar.bgcolor = ft.Colors.with_opacity(
+                t_op, self.title_bar.theme_color
+            )
+
+            if cs.get_config_value("bg_navbar_transparent", True):
+                n_op = cs.get_config_value("bg_navbar_opacity", 0.55)
+            else:
+                n_op = 1.0
+            self.navigation_container.bgcolor = ft.Colors.with_opacity(
+                n_op, ft.Colors.SURFACE
+            )
+
+            if cs.get_config_value("bg_content_transparent", True):
+                c_op = cs.get_config_value("bg_content_opacity", 0.75)
+            else:
+                c_op = 1.0
+            self.content_bg.bgcolor = ft.Colors.with_opacity(
+                c_op, ft.Colors.SURFACE
+            )
+        else:
+            self.title_bar.bgcolor = ft.Colors.with_opacity(
+                0.95, self.title_bar.theme_color
+            )
+            self.navigation_container.bgcolor = ft.Colors.with_opacity(
+                1.0, ft.Colors.SURFACE
+            )
+            self.content_bg.bgcolor = None
+
     def apply_background(self, image_path: Optional[str], fit_mode: Optional[str]) -> None:
         """应用背景图片到主界面。
-        
+
+        使用 Container + DecorationImage 作为背景层，覆盖整个窗口
+        （包括标题栏和导航栏），各层通过半透明 bgcolor 让背景透出。
+
         Args:
             image_path: 背景图片路径，None表示清除背景
             fit_mode: 图片适应模式 (cover, contain, fill, none)
         """
         if image_path:
-            # 转换适应模式
             fit_map = {
                 "cover": ft.BoxFit.COVER,
                 "contain": ft.BoxFit.CONTAIN,
@@ -1238,72 +1283,46 @@ class MainView(ft.Column):
                 "none": ft.BoxFit.NONE,
             }
             fit = fit_map.get(fit_mode, ft.BoxFit.COVER)
-            
-            # 创建带背景的Stack
-            if not hasattr(self, '_background_stack'):
-                # 首次创建背景层
-                # 找到main_content (ft.Row)
-                old_main_content = None
-                for i, control in enumerate(self.controls):
-                    if isinstance(control, ft.Row):
-                        old_main_content = control
-                        self._main_content_index = i
-                        break
-                
-                if old_main_content:
-                    # 创建背景图片控件
-                    self._background_image_control = ft.Image(
-                        src=image_path,
-                        fit=fit,
-                        opacity=0.20,  # 背景图片透明度(20%),避免影响内容可读性
-                        width=float('inf'),  # 占满宽度
-                        height=float('inf'),  # 占满高度
-                    )
-                    
-                    # 背景容器,确保填满整个区域
-                    self._background_container = ft.Container(
-                        content=self._background_image_control,
+
+            if not hasattr(self, '_bg_wrapper'):
+                self._original_controls = list(self.controls)
+
+                self._bg_decoration = ft.DecorationImage(
+                    src=image_path,
+                    fit=fit,
+                    opacity=0.20,
+                )
+
+                # 用一个 Container 包裹全部原始内容，Container 自带背景图
+                self._bg_wrapper = ft.Container(
+                    content=ft.Column(
+                        controls=self._original_controls,
+                        spacing=0,
                         expand=True,
-                        alignment=ft.Alignment.CENTER,
-                    )
-                    
-                    # 使用Stack层叠布局
-                    self._background_stack = ft.Stack(
-                        controls=[
-                            self._background_container,  # 背景层
-                            old_main_content,  # 内容层
-                        ],
-                        expand=True,
-                    )
-                    
-                    # 替换controls中的main_content为stack
-                    self.controls[self._main_content_index] = self._background_stack
-                    if self._page:
-                        self._page.update()
+                    ),
+                    image=self._bg_decoration,
+                    expand=True,
+                    padding=0,
+                )
+
+                self.controls = [self._bg_wrapper]
+                self._apply_bg_opacity_from_config()
+                if self._page:
+                    self._page.update()
             else:
-                # 更新现有背景图片
-                if hasattr(self, '_background_image_control'):
-                    self._background_image_control.src = image_path
-                    self._background_image_control.fit = fit
-                    if self._page:
-                        self._page.update()
+                self._bg_decoration.src = image_path
+                self._bg_decoration.fit = fit
+                self._apply_bg_opacity_from_config()
+                if self._page:
+                    self._page.update()
         else:
-            # 清除背景图片
-            if hasattr(self, '_background_stack') and hasattr(self, '_main_content_index'):
-                # 恢复原始布局
-                # 获取内容层（main_content）- 第二个控件
-                if len(self._background_stack.controls) >= 2:
-                    main_content = self._background_stack.controls[1]
-                    
-                    # 替换stack为main_content
-                    self.controls[self._main_content_index] = main_content
-                    
-                    # 删除背景相关属性
-                    delattr(self, '_background_stack')
-                    delattr(self, '_background_image_control')
-                    if hasattr(self, '_background_container'):
-                        delattr(self, '_background_container')
-                    delattr(self, '_main_content_index')
-                    
-                    if self._page:
-                        self._page.update()
+            if hasattr(self, '_bg_wrapper') and hasattr(self, '_original_controls'):
+                self.controls = self._original_controls
+
+                delattr(self, '_bg_wrapper')
+                delattr(self, '_bg_decoration')
+                delattr(self, '_original_controls')
+
+                self._apply_bg_opacity_from_config()
+                if self._page:
+                    self._page.update()

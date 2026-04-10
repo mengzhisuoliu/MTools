@@ -1436,7 +1436,89 @@ class SettingsView(ft.Container):
             ],
             spacing=PADDING_SMALL,
         )
-        
+
+        # ── 背景透明度控制区域 ──
+        has_bg = bool(current_bg_image)
+
+        self._bg_titlebar_switch = ft.Switch(
+            label="标题栏透明",
+            value=self.config_service.get_config_value("bg_titlebar_transparent", True),
+            on_change=self._on_bg_titlebar_switch,
+        )
+        self._bg_titlebar_slider = ft.Slider(
+            min=0.1, max=0.9, divisions=16,
+            value=self.config_service.get_config_value("bg_titlebar_opacity", 0.45),
+            on_change=self._on_bg_titlebar_opacity,
+        )
+        self._bg_titlebar_label = ft.Text(
+            f"{int(self.config_service.get_config_value('bg_titlebar_opacity', 0.45) * 100)}%",
+            size=12, width=40, text_align=ft.TextAlign.END,
+        )
+
+        self._bg_navbar_switch = ft.Switch(
+            label="导航栏透明",
+            value=self.config_service.get_config_value("bg_navbar_transparent", True),
+            on_change=self._on_bg_navbar_switch,
+        )
+        self._bg_navbar_slider = ft.Slider(
+            min=0.1, max=0.9, divisions=16,
+            value=self.config_service.get_config_value("bg_navbar_opacity", 0.55),
+            on_change=self._on_bg_navbar_opacity,
+        )
+        self._bg_navbar_label = ft.Text(
+            f"{int(self.config_service.get_config_value('bg_navbar_opacity', 0.55) * 100)}%",
+            size=12, width=40, text_align=ft.TextAlign.END,
+        )
+
+        self._bg_content_switch = ft.Switch(
+            label="内容区透明",
+            value=self.config_service.get_config_value("bg_content_transparent", True),
+            on_change=self._on_bg_content_switch,
+        )
+        self._bg_content_slider = ft.Slider(
+            min=0.1, max=0.9, divisions=16,
+            value=self.config_service.get_config_value("bg_content_opacity", 0.75),
+            on_change=self._on_bg_content_opacity,
+        )
+        self._bg_content_label = ft.Text(
+            f"{int(self.config_service.get_config_value('bg_content_opacity', 0.75) * 100)}%",
+            size=12, width=40, text_align=ft.TextAlign.END,
+        )
+
+        # 根据开关状态决定滑块是否可交互
+        self._bg_titlebar_slider.disabled = not self._bg_titlebar_switch.value
+        self._bg_navbar_slider.disabled = not self._bg_navbar_switch.value
+        self._bg_content_slider.disabled = not self._bg_content_switch.value
+
+        def _build_opacity_row(switch, label, slider):
+            return ft.Column(
+                controls=[
+                    ft.Row(
+                        controls=[switch, label],
+                        alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+                    ),
+                    slider,
+                ],
+                spacing=0,
+            )
+
+        self._bg_opacity_section = ft.Container(
+            content=ft.Column(
+                controls=[
+                    ft.Text("背景透明度", size=14, weight=ft.FontWeight.W_500),
+                    ft.Text(
+                        "设置背景图片时，可让各区域变半透明以显示背景",
+                        size=11, color=ft.Colors.ON_SURFACE_VARIANT,
+                    ),
+                    _build_opacity_row(self._bg_titlebar_switch, self._bg_titlebar_label, self._bg_titlebar_slider),
+                    _build_opacity_row(self._bg_navbar_switch, self._bg_navbar_label, self._bg_navbar_slider),
+                    _build_opacity_row(self._bg_content_switch, self._bg_content_label, self._bg_content_slider),
+                ],
+                spacing=PADDING_SMALL,
+            ),
+            visible=has_bg,
+        )
+
         return ft.Container(
             content=ft.Column(
                 controls=[
@@ -1445,6 +1527,8 @@ class SettingsView(ft.Container):
                     opacity_container,
                     ft.Container(height=PADDING_MEDIUM),
                     bg_image_container,
+                    ft.Container(height=PADDING_MEDIUM),
+                    self._bg_opacity_section,
                 ],
                 spacing=0,
             ),
@@ -1469,15 +1553,17 @@ class SettingsView(ft.Container):
         # 立即应用透明度 - 使用 window.opacity
         page.window.opacity = value
         
-        # 同时更新导航栏的透明度
-        if hasattr(page, '_main_view') and hasattr(page._main_view, 'navigation_container'):
-            # 根据窗口透明度调整导航栏背景透明度
-            # 调整为与窗口透明度一致，避免视觉差异过大
-            nav_opacity = 0.95 * value  # 从0.85改为0.95，让导航栏更接近窗口透明度
-            page._main_view.navigation_container.bgcolor = ft.Colors.with_opacity(
-                nav_opacity, 
-                ft.Colors.SURFACE
-            )
+        # 同时更新各区域透明度
+        if hasattr(page, '_main_view'):
+            mv = page._main_view
+            has_bg = bool(self.config_service.get_config_value("background_image", None))
+            if has_bg:
+                mv._apply_bg_opacity_from_config()
+            else:
+                if hasattr(mv, 'navigation_container'):
+                    mv.navigation_container.bgcolor = ft.Colors.with_opacity(1.0, ft.Colors.SURFACE)
+                if hasattr(mv, 'title_bar'):
+                    mv.title_bar.bgcolor = ft.Colors.with_opacity(0.95 * value, mv.title_bar.theme_color)
         
         # 同时更新 FAB 的透明度
         if hasattr(page, '_main_view_instance') and hasattr(page._main_view_instance, 'fab_search') and page._main_view_instance.fab_search:
@@ -1487,18 +1573,53 @@ class SettingsView(ft.Container):
                 ft.Colors.PRIMARY
             )
         
-        # 同时更新标题栏的透明度
-        if hasattr(page, '_main_view') and hasattr(page._main_view, 'title_bar'):
-            # 标题栏保持较高的不透明度以保持可读性
-            title_bar_opacity = 0.95 * value
-            theme_color = page._main_view.title_bar.theme_color
-            page._main_view.title_bar.bgcolor = ft.Colors.with_opacity(
-                title_bar_opacity,
-                theme_color
-            )
-        
         page.update()
     
+    # ── 背景各区域透明度事件 ──
+
+    def _refresh_bg_opacity(self) -> None:
+        """读取配置并刷新各区域透明度。"""
+        page = getattr(self, '_saved_page', self._page)
+        if page and hasattr(page, '_main_view'):
+            page._main_view._apply_bg_opacity_from_config()
+            page.update()
+
+    def _on_bg_titlebar_switch(self, e: ft.ControlEvent) -> None:
+        on = e.control.value
+        self.config_service.set_config_value("bg_titlebar_transparent", on)
+        self._bg_titlebar_slider.disabled = not on
+        self._refresh_bg_opacity()
+
+    def _on_bg_titlebar_opacity(self, e: ft.ControlEvent) -> None:
+        v = e.control.value
+        self._bg_titlebar_label.value = f"{int(v * 100)}%"
+        self.config_service.set_config_value("bg_titlebar_opacity", v)
+        self._refresh_bg_opacity()
+
+    def _on_bg_navbar_switch(self, e: ft.ControlEvent) -> None:
+        on = e.control.value
+        self.config_service.set_config_value("bg_navbar_transparent", on)
+        self._bg_navbar_slider.disabled = not on
+        self._refresh_bg_opacity()
+
+    def _on_bg_navbar_opacity(self, e: ft.ControlEvent) -> None:
+        v = e.control.value
+        self._bg_navbar_label.value = f"{int(v * 100)}%"
+        self.config_service.set_config_value("bg_navbar_opacity", v)
+        self._refresh_bg_opacity()
+
+    def _on_bg_content_switch(self, e: ft.ControlEvent) -> None:
+        on = e.control.value
+        self.config_service.set_config_value("bg_content_transparent", on)
+        self._bg_content_slider.disabled = not on
+        self._refresh_bg_opacity()
+
+    def _on_bg_content_opacity(self, e: ft.ControlEvent) -> None:
+        v = e.control.value
+        self._bg_content_label.value = f"{int(v * 100)}%"
+        self.config_service.set_config_value("bg_content_opacity", v)
+        self._refresh_bg_opacity()
+
     async def _on_pick_bg_image(self, e: ft.ControlEvent) -> None:
         """选择背景图片。"""
         result = await pick_files(
@@ -1560,37 +1681,19 @@ class SettingsView(ft.Container):
         if hasattr(page, '_main_view') and hasattr(page._main_view, 'apply_background'):
             page._main_view.apply_background(image_path, fit_mode)
             
-        # 应用背景后,重新应用当前的窗口透明度和各组件的透明度
-        current_opacity = self.config_service.get_config_value("window_opacity", 1.0)
-        
-        # 重新应用窗口透明度
-        page.window.opacity = current_opacity
-        
-        # 重新应用导航栏透明度
-        if hasattr(page, '_main_view') and hasattr(page._main_view, 'navigation_container'):
-            nav_opacity = 0.85 * current_opacity
-            page._main_view.navigation_container.bgcolor = ft.Colors.with_opacity(
-                nav_opacity, 
-                ft.Colors.SURFACE
-            )
-        
+        # 显示/隐藏透明度控制区域
+        if hasattr(self, '_bg_opacity_section'):
+            self._bg_opacity_section.visible = bool(image_path)
+
+        page.window.opacity = self.config_service.get_config_value("window_opacity", 1.0)
+
         # 重新应用 FAB 透明度
+        current_opacity = self.config_service.get_config_value("window_opacity", 1.0)
         if hasattr(page, '_main_view_instance') and hasattr(page._main_view_instance, 'fab_search') and page._main_view_instance.fab_search:
-            fab_opacity = 0.9 * current_opacity
             page._main_view_instance.fab_search.bgcolor = ft.Colors.with_opacity(
-                fab_opacity,
-                ft.Colors.PRIMARY
+                0.9 * current_opacity, ft.Colors.PRIMARY
             )
-        
-        # 重新应用标题栏透明度
-        if hasattr(page, '_main_view') and hasattr(page._main_view, 'title_bar'):
-            title_bar_opacity = 0.95 * current_opacity
-            theme_color = page._main_view.title_bar.theme_color
-            page._main_view.title_bar.bgcolor = ft.Colors.with_opacity(
-                title_bar_opacity,
-                theme_color
-            )
-        
+
         page.update()
 
     def _fetch_bing_wallpaper(self, n: int = 8) -> Optional[List[Dict]]:
