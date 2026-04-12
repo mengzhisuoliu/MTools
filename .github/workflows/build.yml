@@ -83,13 +83,6 @@ jobs:
             arch: amd64
             artifact_ext: .tar.gz
             cuda_variant: cuda
-          # Linux CUDA Full 版（内置 CUDA 和 cuDNN）
-          - os: ubuntu-22.04
-            platform: Linux
-            flet_platform: linux
-            arch: amd64
-            artifact_ext: .tar.gz
-            cuda_variant: cuda_full
 
     runs-on: ${{ matrix.os }}
     
@@ -346,11 +339,7 @@ jobs:
       - name: List artifacts
         run: |
           echo "Downloaded artifacts:"
-          ls -la artifacts/
-          echo "=== ZIP files ==="
-          find artifacts -type f -name "*.zip"
-          echo "=== TAR.GZ files ==="
-          find artifacts -type f -name "*.tar.gz"
+          ls -laR artifacts/
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
