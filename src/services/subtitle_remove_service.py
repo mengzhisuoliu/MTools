@@ -7,13 +7,15 @@
 import copy
 import os
 from pathlib import Path
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, TYPE_CHECKING
 
 import cv2
 import numpy as np
-import onnxruntime as ort
 
 from utils import logger
+
+if TYPE_CHECKING:
+    import onnxruntime as ort
 from utils.onnx_helper import create_onnx_session
 
 
@@ -62,9 +64,9 @@ class SubtitleRemoveService:
     
     def __init__(self):
         """初始化服务。"""
-        self.encoder_session: Optional[ort.InferenceSession] = None
-        self.infer_session: Optional[ort.InferenceSession] = None
-        self.decoder_session: Optional[ort.InferenceSession] = None
+        self.encoder_session = None  # Optional[ort.InferenceSession]
+        self.infer_session = None   # Optional[ort.InferenceSession]
+        self.decoder_session = None # Optional[ort.InferenceSession]
         
         # 模型参数
         self.encoder_batch_size = 10

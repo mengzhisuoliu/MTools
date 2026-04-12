@@ -10,11 +10,11 @@ from pathlib import Path
 from typing import Optional, Tuple, Callable, Union, TYPE_CHECKING
 
 import numpy as np
-import onnxruntime as ort
 import ffmpeg
 from utils import create_onnx_session
 
 if TYPE_CHECKING:
+    import onnxruntime as ort
     from services import FFmpegService, ConfigService
     from constants import ModelInfo
 
@@ -45,7 +45,7 @@ class VocalSeparationService:
         if self.model_dir:
             self.model_dir.mkdir(parents=True, exist_ok=True)
         
-        self.session: Optional['ort.InferenceSession'] = None
+        self.session = None  # Optional[ort.InferenceSession]
         self.current_model: Optional[str] = None
         self.model_channels: int = 0
         self.model_freq_bins: int = 0

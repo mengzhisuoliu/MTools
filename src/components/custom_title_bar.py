@@ -682,108 +682,96 @@ class CustomTitleBar(ft.Container):
             logger.error(f"设置系统托盘失败: {e}")
             self.tray_icon = None
     
+    # ── 托盘 ↔ 窗口 切换 ──────────────────────────────────────
+    # SW_HIDE / window.visible=False → Flutter 停止渲染 → 恢复后白屏
+    # skip_task_bar → Windows 上无效 (flet#6302)
+    # WS_EX_TOOLWINDOW + minimized → 左下角留缩略图
+    #
+    # 最终方案：opacity=0 + minimized + WS_EX_TOOLWINDOW
+    #   opacity=0  → 窗口透明，Flutter 继续渲染
+    #   minimized  → 不占屏幕
+    #   TOOLWINDOW → 不占任务栏
+    #   三合一 = 完全不可见，但渲染不中断
+
+    _tray_saved_opacity: float = 1.0
+
+    @staticmethod
+    def _win32_set_taskbar_visible(visible: bool) -> None:
+        if sys.platform != 'win32':
+            return
+        try:
+            import ctypes
+            user32 = ctypes.windll.user32
+            hwnd = user32.FindWindowW(None, APP_TITLE)
+            if not hwnd:
+                return
+            GWL_EXSTYLE = -20
+            style = user32.GetWindowLongW(hwnd, GWL_EXSTYLE)
+            if visible:
+                style = (style | 0x00040000) & ~0x00000080  # +APPWINDOW -TOOLWINDOW
+            else:
+                style = (style & ~0x00040000) | 0x00000080  # -APPWINDOW +TOOLWINDOW
+            user32.SetWindowLongW(hwnd, GWL_EXSTYLE, style)
+            user32.SetWindowPos(hwnd, 0, 0, 0, 0, 0, 0x0027)  # NOMOVE|NOSIZE|NOZORDER|FRAMECHANGED
+        except Exception:
+            pass
+
     def _show_window_from_tray(self, icon=None, item=None) -> None:
-        """从托盘显示窗口（带淡入动画）。
-        
-        Args:
-            icon: 托盘图标对象
-            item: 菜单项对象
-        """
-        try:
-            # 获取用户配置的透明度
-            target_opacity = 1.0
-            if self.config_service:
-                target_opacity = self.config_service.get_config_value("window_opacity", 1.0)
-            
-            # 先显示窗口但设置为透明
-            self._page.window.opacity = 0.0
-            self._page.window.visible = True
-            self._page.update()
-            
-            # 使用定时器实现淡入动画
-            import time
-            def fade_in():
-                try:
-                    # 分10步淡入，总耗时约150ms
-                    for i in range(1, 11):
-                        self._page.window.opacity = (i / 10.0) * target_opacity
-                        self._page.update()
-                        time.sleep(0.015)
-                    
-                    # 确保最终透明度准确
-                    self._page.window.opacity = target_opacity
-                    self._page.update()
-                except Exception:
-                    pass
-            
-            # 在后台线程执行动画
-            threading.Thread(target=fade_in, daemon=True).start()
-        except Exception:
-            pass
-    
-    def _hide_to_tray(self) -> None:
-        """隐藏窗口到托盘（带淡出动画）。"""
-        try:
-            import time
-            
-            # 获取用户配置的透明度（作为动画起始值）
-            start_opacity = 1.0
-            if self.config_service:
-                start_opacity = self.config_service.get_config_value("window_opacity", 1.0)
-            
-            # 淡出动画
-            def fade_out():
-                try:
-                    # 分10步淡出，总耗时约150ms
-                    for i in range(9, -1, -1):
-                        self._page.window.opacity = (i / 10.0) * start_opacity
-                        self._page.update()
-                        time.sleep(0.015)
-                    
-                    # 动画结束后隐藏窗口
-                    self._page.window.visible = False
-                    self._page.update()
-                    
-                    # 恢复用户设置的透明度（下次显示时使用）
-                    self._page.window.opacity = start_opacity
-                except Exception:
-                    pass
-            
-            # 在后台线程执行动画
-            threading.Thread(target=fade_out, daemon=True).start()
-        except Exception:
-            pass
-    
-    def _exit_app_from_tray(self, icon=None, item=None) -> None:
-        """从托盘退出应用。
-        
-        Args:
-            icon: 托盘图标对象
-            item: 菜单项对象
-        """
-        try:
-            # 如果窗口当前不可见，先显示窗口（不带动画，直接显示）
-            if not self._page.window.visible:
-                # 获取用户配置的透明度
-                target_opacity = 1.0
-                if self.config_service:
-                    target_opacity = self.config_service.get_config_value("window_opacity", 1.0)
-                
-                self._page.window.opacity = target_opacity
-                self._page.window.visible = True
+        """从托盘恢复窗口。"""
+        self._win32_set_taskbar_visible(True)
+
+        async def _restore():
+            try:
+                self._page.window.minimized = False
+                self._page.window.opacity = self._tray_saved_opacity
+                self._page.window.focused = True
                 self._page.update()
-            
-            # 停止托盘图标
+            except Exception:
+                pass
+        try:
+            self._page.run_task(_restore)
+        except Exception:
+            pass
+
+    def _hide_to_tray(self) -> None:
+        """隐藏窗口到托盘（opacity=0 + minimized + 任务栏隐藏）。"""
+        async def _hide():
+            try:
+                self._tray_saved_opacity = self._page.window.opacity or 1.0
+                self._page.window.opacity = 0.0
+                self._page.window.minimized = True
+                self._page.update()
+            except Exception:
+                pass
+        try:
+            self._page.run_task(_hide)
+        except Exception:
+            pass
+        self._win32_set_taskbar_visible(False)
+
+    def _exit_app_from_tray(self, icon=None, item=None) -> None:
+        """从托盘退出应用。"""
+        try:
             if self.tray_icon:
                 self.tray_icon.stop()
                 self.tray_icon = None
-            
-            # 执行真正的关闭流程（传递 force=True 强制退出）
-            self._close_window(None, force=True)
-        except Exception as e:
-            # 如果出错，确保能退出
-            import sys
-            sys.exit(0)
+        except Exception:
+            pass
+
+        self._show_window_from_tray()
+
+        async def _quit():
+            try:
+                self._close_window(None, force=True)
+            except Exception:
+                import sys as _sys
+                _sys.exit(0)
+
+        try:
+            self._page.run_task(_quit)
+        except Exception:
+            import sys as _sys
+            _sys.exit(0)
     
     def set_minimize_to_tray(self, enabled: bool) -> None:
         """设置是否启用最小化到托盘。

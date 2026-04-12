@@ -155,40 +155,21 @@ def main(page: ft.Page) -> None:
     if hasattr(main_view, '_pending_bg_image') and main_view._pending_bg_image:
         main_view.apply_background(main_view._pending_bg_image, main_view._pending_bg_fit)
     
-    # 检查是否以最小化模式启动（开机自启动时使用）
-    if '--minimized' in sys.argv:
-        # 延迟隐藏到托盘，确保窗口和托盘图标已初始化
-        def hide_to_tray_delayed():
-            import time
-            time.sleep(0.5)  # 等待托盘图标初始化
-            try:
-                if hasattr(main_view, 'title_bar') and hasattr(main_view.title_bar, '_hide_to_tray'):
-                    # 强制启用最小化到托盘功能
-                    main_view.title_bar.minimize_to_tray = True
-                    main_view.title_bar._hide_to_tray()
-                    logger.info("开机自启动：已最小化到托盘")
-            except Exception as e:
-                logger.error(f"最小化到托盘失败: {e}")
-        
-        import threading
-        threading.Thread(target=hide_to_tray_delayed, daemon=True).start()
-    
-    # 检查并修复开机自启动路径（仅编译后）
-    _check_and_fix_auto_start(config_service)
-    
     # 启动时检查更新，方法留存
-    # 底部 snackbar
     # auto_check = config_service.get_config_value("auto_check_update", True)
     # if auto_check:
     #     _check_update_on_startup(page, config_service)
-    
+
+    # 清理残留的开机自启动注册表项和配置（功能已禁用）
+    _cleanup_auto_start_registry()
+    if config_service.get_config_value("auto_start", False):
+        config_service.set_config_value("auto_start", False)
+
     # 检查桌面快捷方式 / macOS Applications 安装（延迟执行，避免阻塞启动）
     _check_desktop_shortcut(page, config_service)
     _check_macos_applications(page, config_service)
-    
-    # 监听窗口事件
+
     def on_window_event(e):
-        """处理窗口事件。"""
         if not _is_macos:
             if e.data == "moved":
                 if not page.window.maximized:
@@ -208,7 +189,7 @@ def main(page: ft.Page) -> None:
                     main_view.title_bar.set_window_focused(e.data == "focus")
             except Exception:
                 pass
-    
+
     page.on_window_event = on_window_event
     
 def _check_update_on_startup(page: ft.Page, config_service: ConfigService) -> None:
@@ -629,63 +610,27 @@ def _check_macos_applications(page: ft.Page, config_service: ConfigService) -> N
     threading.Thread(target=check_task, daemon=True).start()
 
 
-def _check_and_fix_auto_start(config_service: ConfigService) -> None:
-    """检查并修复开机自启动路径。
-    
-    如果软件位置移动了，注册表中的路径会失效。
-    此函数会检测并自动更新为当前路径。
-    """
-    import sys
-    from pathlib import Path
-    
-    # 仅编译后生效
-    if Path(sys.argv[0]).suffix.lower() != '.exe':
+def _cleanup_auto_start_registry() -> None:
+    """清理注册表中残留的开机自启动项。"""
+    if sys.platform != 'win32':
         return
-    
-    # 仅当用户开启了自启动时检查
-    auto_start_enabled = config_service.get_config_value("auto_start", False)
-    if not auto_start_enabled:
-        return
-    
     try:
         import winreg
-        
-        app_name = "MTools"
-        key_path = r"Software\Microsoft\Windows\CurrentVersion\Run"
-        current_exe = sys.argv[0]
-        expected_cmd = f'"{current_exe}" --minimized'
-        
-        # 读取注册表中的当前值
+        key = winreg.OpenKey(
+            winreg.HKEY_CURRENT_USER,
+            r"Software\Microsoft\Windows\CurrentVersion\Run",
+            0,
+            winreg.KEY_READ | winreg.KEY_SET_VALUE,
+        )
         try:
-            key = winreg.OpenKey(
-                winreg.HKEY_CURRENT_USER,
-                key_path,
-                0,
-                winreg.KEY_READ | winreg.KEY_SET_VALUE
-            )
-            
-            try:
-                reg_value, _ = winreg.QueryValueEx(key, app_name)
-                
-                # 检查路径是否匹配
-                if reg_value != expected_cmd:
-                    # 路径不匹配，更新注册表
-                    winreg.SetValueEx(key, app_name, 0, winreg.REG_SZ, expected_cmd)
-                    logger.info(f"开机自启动路径已更新: {expected_cmd}")
-                    
-            except FileNotFoundError:
-                # 注册表项不存在，但配置中显示已启用，重新创建
-                winreg.SetValueEx(key, app_name, 0, winreg.REG_SZ, expected_cmd)
-                logger.info(f"开机自启动已重新注册: {expected_cmd}")
-            
-            winreg.CloseKey(key)
-            
+            winreg.QueryValueEx(key, "MTools")
+            winreg.DeleteValue(key, "MTools")
+            logger.info("已清理残留的开机自启动注册表项")
         except FileNotFoundError:
-            # 整个 Run 键不存在（极少情况）
             pass
-            
-    except Exception as e:
-        logger.warning(f"检查开机自启动路径失败: {e}")
+        winreg.CloseKey(key)
+    except Exception:
+        pass
 
 
 # 启动应用

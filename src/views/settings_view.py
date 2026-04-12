@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Optional, List, Dict
 import threading
 import time
+import os
 import sys
 import platform
 import webbrowser
@@ -2006,22 +2007,18 @@ class SettingsView(ft.Container):
             color=ft.Colors.ON_SURFACE_VARIANT,
         )
         
-        # 开机自启动（仅编译后生效）
-        auto_start = self.config_service.get_config_value("auto_start", False)
-        is_compiled = self._is_compiled()
-        
+        # 开机自启动（功能暂时禁用）
         self.auto_start_switch = ft.Switch(
             label="开机自启动",
-            value=auto_start if is_compiled else False,
+            value=False,
             on_change=self._on_auto_start_switch_change,
-            disabled=not is_compiled,
+            disabled=True,
         )
         
-        # 开机自启动说明文字
         auto_start_info = ft.Text(
-            "开启后，系统启动时自动运行并最小化到托盘" if is_compiled else "此功能仅在编译后的版本中可用",
+            "此功能暂时不可用，将在后续版本中修复",
             size=12,
-            color=ft.Colors.ON_SURFACE_VARIANT if is_compiled else ft.Colors.ORANGE,
+            color=ft.Colors.ORANGE,
         )
         
         return ft.Container(
@@ -2119,22 +2116,34 @@ class SettingsView(ft.Container):
         else:
             self._show_snackbar("设置更新失败", ft.Colors.RED)
     
-    def _is_compiled(self) -> bool:
-        """检查是否为编译后的版本。"""
-        from pathlib import Path
-        return Path(sys.argv[0]).suffix.lower() == '.exe'
+    @staticmethod
+    def _is_compiled() -> bool:
+        """检查是否为编译后的版本（支持 Nuitka 和 flet build）。"""
+        if getattr(sys, 'frozen', False):
+            return True
+        if os.environ.get("SERIOUS_PYTHON_SITE_PACKAGES"):
+            return True
+        exe_name = os.path.basename(sys.executable).lower()
+        if sys.executable.endswith('.exe'):
+            return exe_name not in ('python.exe', 'python3.exe', 'pythonw.exe')
+        return exe_name not in ('python', 'python3', 'python2')
     
     def _on_auto_start_switch_change(self, e: ft.ControlEvent) -> None:
-        """开机自启动开关改变事件。"""
+        """开机自启动开关改变事件（功能暂时禁用）。"""
+        self._show_snackbar("此功能暂时不可用，将在后续版本中修复", ft.Colors.ORANGE)
+        e.control.value = False
+        self._page.update()
+        return
+
+        # --- 以下代码暂时禁用 ---
         enabled = e.control.value
-        
+
         if not self._is_compiled():
             self._show_snackbar("此功能仅在编译后的版本中可用", ft.Colors.ORANGE)
             e.control.value = False
             self._page.update()
             return
-        
-        # 设置注册表
+
         success = self._set_auto_start(enabled)
         
         if success:
@@ -2146,53 +2155,77 @@ class SettingsView(ft.Container):
             e.control.value = not enabled
             self._page.update()
     
+    @staticmethod
+    def _get_app_exe_path() -> str | None:
+        """获取应用主程序 exe 路径（支持 Nuitka 和 flet build）。"""
+        from pathlib import Path
+
+        # Nuitka: sys.argv[0] 就是 exe
+        if getattr(sys, 'frozen', False):
+            p = Path(sys.argv[0])
+            if p.suffix.lower() == '.exe':
+                return str(p.resolve())
+
+        # flet build: SERIOUS_PYTHON_SITE_PACKAGES 在 <app_dir>/app_packages
+        sp = os.environ.get("SERIOUS_PYTHON_SITE_PACKAGES")
+        if sp:
+            app_dir = Path(sp).parent
+            candidate = app_dir / "MTools.exe"
+            if candidate.exists():
+                return str(candidate.resolve())
+
+        # Fallback: sys.executable 本身
+        p = Path(sys.executable)
+        if p.suffix.lower() == '.exe' and p.stem.lower() not in (
+            'python', 'python3', 'pythonw',
+        ):
+            return str(p.resolve())
+
+        return None
+
     def _set_auto_start(self, enable: bool) -> bool:
         """设置开机自启动（注册表方式）。
-        
+
         Args:
             enable: 是否启用
-            
+
         Returns:
             是否成功
         """
         if sys.platform != 'win32':
             return False
-        
+
         try:
             import winreg
-            from pathlib import Path
-            
+
             app_name = "MTools"
             key_path = r"Software\Microsoft\Windows\CurrentVersion\Run"
-            
+
             key = winreg.OpenKey(
                 winreg.HKEY_CURRENT_USER,
                 key_path,
                 0,
-                winreg.KEY_SET_VALUE | winreg.KEY_READ
+                winreg.KEY_SET_VALUE | winreg.KEY_READ,
             )
-            
+
             if enable:
-                # 获取可执行文件路径，添加 --minimized 参数
-                exe_path = sys.argv[0]
-                if Path(exe_path).suffix.lower() == '.exe':
-                    # 使用 --minimized 参数启动时最小化到托盘
-                    startup_cmd = f'"{exe_path}" --minimized'
-                    winreg.SetValueEx(key, app_name, 0, winreg.REG_SZ, startup_cmd)
-                    logger.info(f"开机自启动已设置: {startup_cmd}")
-                else:
+                exe_path = self._get_app_exe_path()
+                if not exe_path:
                     winreg.CloseKey(key)
                     return False
+                startup_cmd = f'"{exe_path}" --minimized'
+                winreg.SetValueEx(key, app_name, 0, winreg.REG_SZ, startup_cmd)
+                logger.info(f"开机自启动已设置: {startup_cmd}")
             else:
                 try:
                     winreg.DeleteValue(key, app_name)
                     logger.info("开机自启动已移除")
                 except FileNotFoundError:
-                    pass  # 不存在也视为成功
+                    pass
             
             winreg.CloseKey(key)
             return True
-            
+
         except Exception as e:
             logger.error(f"设置开机自启动失败: {e}")
             return False

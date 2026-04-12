@@ -138,11 +138,10 @@ class UpdateService:
         Returns:
             CUDA 变体标识：'none', 'cuda', 或 'cuda_full'
         """
-        # 检查是否是编译后的程序
-        # 注意：Nuitka 不设置 sys.frozen，需要检查 sys.argv[0] 是否为 .exe
+        # 检查是否是编译后的程序（支持 Nuitka 和 flet build）
         import sys
-        from pathlib import Path as PathLib
-        is_frozen = sys.argv[0].endswith('.exe') if sys.argv else False
+        from services.auto_updater import _is_packaged_app
+        is_frozen = _is_packaged_app()
         
         # 优先使用构建时写入的信息
         try:

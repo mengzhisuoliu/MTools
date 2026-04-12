@@ -11,7 +11,6 @@ from pathlib import Path
 from typing import Optional, Tuple, TYPE_CHECKING
 
 import numpy as np
-import onnxruntime as ort
 from PIL import Image
 
 from constants.model_config import (
@@ -22,6 +21,7 @@ from constants.model_config import (
 from utils import create_onnx_session
 
 if TYPE_CHECKING:
+    import onnxruntime as ort
     from services import ConfigService
 
 logger = logging.getLogger(__name__)
@@ -46,7 +46,7 @@ class FrameInterpolationService:
         """
         self.model_name: str = model_name
         self.config_service: Optional['ConfigService'] = config_service
-        self.sess: Optional[ort.InferenceSession] = None
+        self.sess = None  # Optional[ort.InferenceSession]
         self.model_info: Optional[FrameInterpolationModelInfo] = None
         self.inference_lock = threading.Lock()  # 线程安全锁
         self._first_inference = True  # 标记是否是首次推理（用于调试日志）
@@ -67,7 +67,7 @@ class FrameInterpolationService:
             raise FileNotFoundError(f"模型文件不存在: {model_path}")
         
         try:
-            # 显示可用的执行提供者
+            import onnxruntime as ort
             available_providers = ort.get_available_providers()
             logger.info(f"系统可用的执行提供者: {', '.join(available_providers)}")
             
