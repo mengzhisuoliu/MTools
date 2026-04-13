@@ -269,7 +269,7 @@ jobs:
         if: runner.os == 'Windows'
         shell: python
         run: |
-          import subprocess, tempfile
+          import subprocess
           from pathlib import Path
 
           build_root = Path("build/windows")
@@ -277,6 +277,19 @@ jobs:
           if not exe.exists():
               print("MTools.exe not found, skip")
               raise SystemExit(0)
+
+          # 查找 mt.exe（Windows SDK 工具，不在 PATH 中）
+          mt_exe = None
+          kits_root = Path(r"C:\Program Files (x86)\Windows Kits\10\bin")
+          if kits_root.is_dir():
+              for mt in sorted(kits_root.rglob("mt.exe"), reverse=True):
+                  if "x64" in str(mt):
+                      mt_exe = str(mt)
+                      break
+          if mt_exe is None:
+              print("WARNING: mt.exe not found, Chinese paths may not work")
+              raise SystemExit(0)
+          print(f"Found mt.exe: {mt_exe}")
 
           manifest = r'''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
           <assembly manifestVersion="1.0" xmlns="urn:schemas-microsoft-com:asm.v1">
@@ -291,22 +304,16 @@ jobs:
           manifest_file.write_text(manifest, encoding="utf-8")
 
           result = subprocess.run(
-              ["mt.exe", "-manifest", str(manifest_file), f"-outputresource:{exe};#1"],
+              [mt_exe, "-manifest", str(manifest_file), f"-outputresource:{exe};#1"],
               capture_output=True, text=True
           )
+          manifest_file.unlink(missing_ok=True)
+
           if result.returncode == 0:
               print("UTF-8 manifest embedded successfully")
           else:
-              print(f"mt.exe failed (rc={result.returncode}): {result.stderr}")
-              print("Trying alternative: rc.exe + resource embedding...")
-              # mt.exe 可能不可用，尝试手动创建资源
-              rc_content = f'1 24 "{manifest_file.name}"'
-              rc_file = build_root / "utf8.rc"
-              rc_file.write_text(rc_content)
-              # 用 windres 或忽略错误（manifest 非必需，只影响中文路径）
-              print("WARNING: UTF-8 manifest not embedded, Chinese paths may not work")
-
-          manifest_file.unlink(missing_ok=True)
+              print(f"WARNING: mt.exe failed (rc={result.returncode}): {result.stderr}")
+              print("Chinese paths may not work")
 
       # ========== 解决 sherpa_onnx 与 onnxruntime-gpu 的 DLL 冲突 ==========
       # sherpa_onnx 自带 onnxruntime.dll (v1.23.2)，会与 onnxruntime-gpu (v1.24.4) 冲突
