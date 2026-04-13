@@ -17,12 +17,10 @@ dependencies = [
   "opencv-python-headless==4.11.0.86",
   "numpy==1.26.4",
   # ONNX Runtime - 自动根据平台选择合适的版本
-  "onnxruntime-directml==1.24.4 ; sys_platform == 'win32'", # Windows DirectML GPU 加速
-  "onnxruntime==1.24.4 ; sys_platform == 'linux'", # Linux
-  "onnxruntime>=1.22.0 ; sys_platform == 'darwin'", # macOS (1.24.4 无 x86_64 wheel，用 >=1.22 兼容 universal build)
+  "onnxruntime-gpu[cuda,cudnn]==1.24.4",
   "websockets==12.0", # 避免弃用警告，等待 flet 更新
   "qrcode[pil]==7.4.2",
-  "sherpa-onnx==1.12.35",
+  "sherpa-onnx==1.12.35+cuda12.cudnn9",
   "pyclipper==1.4.0",
   "shapely==2.1.2",
   "httpx[socks]==0.28.1",
@@ -78,3 +76,6 @@ package-mode = false
 
 [tool.poetry.group.dev.dependencies]
 flet = {extras = ["all"], version = "0.84.0"}
+
+[tool.uv]
+find-links = ["https://k2-fsa.github.io/sherpa/onnx/cuda.html"]

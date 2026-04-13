@@ -188,6 +188,29 @@ def _setup_library_paths():
                 if debug_patch:
                     print(f"DEBUG | PATH 已更新: {lib_path}")
 
+        # ── 预加载 CUDA 运行时 DLL（打包环境需要） ──────────────
+        # onnxruntime 的 LoadLibraryExW 在打包环境下可能找不到 CUDA DLL，
+        # 提前用 ctypes.CDLL 加载到进程内存可以解决此问题
+        import ctypes
+        _cuda_preload_names = [
+            "cudart64_12.dll", "cublasLt64_12.dll", "cublas64_12.dll",
+            "cufft64_11.dll", "curand64_10.dll", "zlibwapi.dll",
+            "cudnn64_9.dll", "cudnn_ops64_9.dll", "cudnn_adv64_9.dll",
+            "cudnn_cnn64_9.dll", "cudnn_graph64_9.dll", "cudnn_heuristic64_9.dll",
+            "cudnn_engines_precompiled64_9.dll", "cudnn_engines_runtime_compiled64_9.dll",
+        ]
+        for _name in _cuda_preload_names:
+            for _lp in lib_paths:
+                _fp = _lp / _name
+                if _fp.is_file():
+                    try:
+                        ctypes.CDLL(str(_fp))
+                        if debug_patch:
+                            print(f"DEBUG | 预加载 CUDA DLL: {_name}")
+                    except Exception:
+                        pass
+                    break
+
     elif system == "Linux":
         ld_path = os.environ.get('LD_LIBRARY_PATH', '')
         for lib_path in lib_paths:

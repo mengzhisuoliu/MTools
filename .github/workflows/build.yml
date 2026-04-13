@@ -255,6 +255,89 @@ jobs:
               tmp.rename(dst)
               print(f"Renamed: {src} -> {dst}")
 
+      # ========== 解决 sherpa_onnx 与 onnxruntime-gpu 的 DLL 冲突 ==========
+      # sherpa_onnx 自带 onnxruntime.dll (v1.23.2)，会与 onnxruntime-gpu (v1.24.4) 冲突
+      # 删掉 sherpa_onnx 自带的 onnxruntime DLLs，强制使用 onnxruntime-gpu 的版本
+      # onnxruntime-gpu 已有完整的 CUDA provider 支持
+
+      - name: Remove sherpa_onnx bundled onnxruntime (Windows)
+        if: matrix.cuda_variant != 'none' && runner.os == 'Windows'
+        shell: python
+        run: |
+          from pathlib import Path
+
+          build_root = Path("build/windows")
+          for sp in build_root.rglob("site-packages"):
+              sherpa_lib = sp / "sherpa_onnx" / "lib"
+              if not sherpa_lib.is_dir():
+                  continue
+              removed = []
+              for name in ["onnxruntime.dll", "onnxruntime_providers_cuda.dll",
+                           "onnxruntime_providers_shared.dll", "onnxruntime_providers_tensorrt.dll"]:
+                  f = sherpa_lib / name
+                  if f.exists():
+                      f.unlink()
+                      removed.append(name)
+              if removed:
+                  print(f"Removed from {sherpa_lib}: {removed}")
+              remaining = [f.name for f in sherpa_lib.iterdir() if f.suffix == '.dll']
+              print(f"Remaining in sherpa_onnx/lib: {remaining}")
+
+      - name: Remove sherpa_onnx bundled onnxruntime (Linux)
+        if: matrix.cuda_variant != 'none' && runner.os == 'Linux'
+        shell: python
+        run: |
+          from pathlib import Path
+
+          build_root = Path("build/linux")
+          for sp in build_root.rglob("site-packages"):
+              sherpa_lib = sp / "sherpa_onnx" / "lib"
+              if not sherpa_lib.is_dir():
+                  continue
+              removed = []
+              for pattern in ["onnxruntime.so*", "onnxruntime_providers_cuda.so*",
+                              "onnxruntime_providers_shared.so*", "onnxruntime_providers_tensorrt.so*",
+                              "libonnxruntime.so*", "libonnxruntime_providers_cuda.so*",
+                              "libonnxruntime_providers_shared.so*"]:
+                  for f in sherpa_lib.glob(pattern):
+                      f.unlink()
+                      removed.append(f.name)
+              if removed:
+                  print(f"Removed from {sherpa_lib}: {removed}")
+              remaining = [f.name for f in sherpa_lib.iterdir() if f.suffix in ('.so', '.dll')]
+              print(f"Remaining in sherpa_onnx/lib: {remaining}")
+
+      # cuda_full 版本：复制 CUDA 运行时 DLL 到 onnxruntime/capi/ 确保打包后也能加载
+      - name: Copy CUDA DLLs to onnxruntime capi (Windows cuda_full)
+        if: matrix.cuda_variant == 'cuda_full' && runner.os == 'Windows'
+        shell: python
+        run: |
+          from pathlib import Path
+          import shutil
+
+          build_root = Path("build/windows")
+          sp_dirs = [sp for sp in build_root.rglob("site-packages") if (sp / "nvidia").is_dir()]
+          if not sp_dirs:
+              print("No site-packages with nvidia found, skip")
+              raise SystemExit(0)
+
+          sp = sp_dirs[0]
+          capi = sp / "onnxruntime" / "capi"
+          if not capi.is_dir():
+              print("onnxruntime/capi not found, skip")
+              raise SystemExit(0)
+
+          cuda_dlls = list((sp / "nvidia").rglob("*.dll"))
+          print(f"Found {len(cuda_dlls)} CUDA DLLs in nvidia/")
+
+          copied = 0
+          for dll in cuda_dlls:
+              dest = capi / dll.name
+              if not dest.exists():
+                  shutil.copy2(dll, dest)
+                  copied += 1
+          print(f"Copied {copied} DLLs to {capi.relative_to(build_root)}")
+
       # ========== 验证 CUDA DLLs ==========
 
       - name: Verify CUDA libraries in build output

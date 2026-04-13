@@ -14,7 +14,7 @@ APP_DESCRIPTION: Final[str] = "MTools 是一个功能强大的全能桌面应用
 
 # CUDA 变体信息（在构建时由 build.py 写入）
 # 可能的值: 'none' (标准版), 'cuda' (CUDA版), 'cuda_full' (CUDA Full版)
-BUILD_CUDA_VARIANT: Final[str] = "none"  # 默认为标准版，构建时会被替换
+BUILD_CUDA_VARIANT: Final[str] = "cuda_full"  # 默认为标准版，构建时会被替换
 
 # GitHub 仓库配置
 GITHUB_OWNER: Final[str] = "HG-ha"

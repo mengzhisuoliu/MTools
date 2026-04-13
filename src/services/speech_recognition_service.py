@@ -459,6 +459,27 @@ class SpeechRecognitionService:
                 )
             raise RuntimeError(f"加载模型失败: {e}")
     
+    @staticmethod
+    def _diagnose_cuda_provider() -> None:
+        """诊断 CUDA provider 加载问题，输出到日志。"""
+        import sys as _sys
+        try:
+            import onnxruntime as ort
+            provs = ort.get_available_providers()
+            logger.info(f"[CUDA诊断] onnxruntime providers: {provs}")
+            logger.info(f"[CUDA诊断] onnxruntime version: {ort.__version__}, path: {ort.__file__}")
+        except Exception as ex:
+            logger.warning(f"[CUDA诊断] onnxruntime import失败: {ex}")
+
+        try:
+            import sherpa_onnx
+            lib_dir = Path(sherpa_onnx.__file__).parent / "lib"
+            if lib_dir.is_dir():
+                dlls = [f.name for f in lib_dir.iterdir() if f.suffix in ('.dll', '.so')]
+                logger.info(f"[CUDA诊断] sherpa_onnx/lib ({len(dlls)} libs): {dlls}")
+        except Exception as ex:
+            logger.warning(f"[CUDA诊断] sherpa_onnx检查失败: {ex}")
+
     def load_sensevoice_model(
         self,
         model_path: Path,
@@ -492,7 +513,10 @@ class SpeechRecognitionService:
 
         try:
             num_threads = min(os.cpu_count() or 4, 8)
-            
+
+            if provider == "cuda":
+                self._diagnose_cuda_provider()
+
             if model_type == "paraformer":
                 self.recognizer = sherpa_onnx.OfflineRecognizer.from_paraformer(
                     paraformer=str(model_path),

@@ -120,8 +120,8 @@ def add_find_links(variant: str) -> None:
 
     block = (
         "\n"
-        "[[tool.uv.find-links]]\n"
-        f'url = "{SHERPA_CUDA_FIND_LINKS}"\n'
+        "[tool.uv]\n"
+        f'find-links = ["{SHERPA_CUDA_FIND_LINKS}"]\n'
     )
     content += block
     PYPROJECT_FILE.write_text(content, encoding="utf-8")
