@@ -433,8 +433,9 @@ jobs:
               for d in sorted(dlls):
                   print(f"  {d}")
 
-          # nvidia packages
+          # nvidia packages (cuda_full 构建中已移动到 onnxruntime/capi/ 并删除)
           nvidia_dir = main_sp / "nvidia"
+          variant = "${{ matrix.cuda_variant }}"
           if nvidia_dir.exists():
               print(f"\nnvidia/ subdirectories:")
               for sub in sorted(nvidia_dir.iterdir()):
@@ -446,13 +447,16 @@ jobs:
                               if files:
                                   print(f"  {sub.name}/{dname}/ ({len(files)} files): {files[:5]}{'...' if len(files) > 5 else ''}")
               print("  ✓ nvidia CUDA libraries found")
-          else:
-              variant = "${{ matrix.cuda_variant }}"
-              if variant == "cuda_full":
-                  print("\n✗ ERROR: nvidia/ not found in cuda_full build!")
-                  sys.exit(1)
+          elif variant == "cuda_full":
+              cuda_in_capi = any("cuda" in f.name.lower() or "cublas" in f.name.lower() or "cudnn" in f.name.lower()
+                                 for f in capi.iterdir()) if capi.exists() else False
+              if cuda_in_capi:
+                  print("\nnvidia/ removed (DLLs moved to onnxruntime/capi/) ✓")
               else:
-                  print("\nnvidia/ not found (expected for cuda variant)")
+                  print("\n✗ ERROR: nvidia/ not found and no CUDA DLLs in onnxruntime/capi/!")
+                  sys.exit(1)
+          else:
+              print("\nnvidia/ not found (expected for cuda variant)")
 
       # ========== 打包产物 ==========
 
