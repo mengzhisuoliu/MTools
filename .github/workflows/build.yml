@@ -270,46 +270,64 @@ jobs:
               print(f"WARNING: build/{platform} not found")
               sys.exit(0)
 
-          # 查找 site-packages
+          # 查找主 site-packages（包含 onnxruntime 的那个）
           sp_dirs = list(build_root.rglob("site-packages"))
           print(f"Found {len(sp_dirs)} site-packages dir(s)")
+
+          main_sp = None
           for sp in sp_dirs:
-              print(f"\n=== {sp} ===")
+              if (sp / "onnxruntime").exists() or (sp / "nvidia").exists():
+                  main_sp = sp
+                  break
 
-              # onnxruntime capi
-              capi = sp / "onnxruntime" / "capi"
-              if capi.exists():
-                  dlls = [f.name for f in capi.iterdir() if f.suffix in ('.dll', '.so', '.pyd', '.dylib')]
-                  print(f"\nonnxruntime/capi/ ({len(dlls)} binaries):")
-                  for d in sorted(dlls):
-                      print(f"  {d}")
-                  cuda_providers = [d for d in dlls if 'cuda' in d.lower()]
-                  if cuda_providers:
-                      print(f"  ✓ CUDA providers found: {cuda_providers}")
-                  else:
-                      print("  ✗ WARNING: No CUDA provider DLLs found!")
-              else:
-                  print("\n✗ WARNING: onnxruntime/capi/ not found!")
+          if main_sp is None:
+              print("WARNING: No site-packages with onnxruntime/nvidia found")
+              for sp in sp_dirs:
+                  print(f"  {sp}")
+              sys.exit(0)
 
-              # nvidia packages
-              nvidia_dir = sp / "nvidia"
-              if nvidia_dir.exists():
-                  print(f"\nnvidia/ subdirectories:")
-                  for sub in sorted(nvidia_dir.iterdir()):
-                      if sub.is_dir():
-                          bin_dir = sub / "bin"
-                          lib_dir = sub / "lib"
-                          for d in (bin_dir, lib_dir):
-                              if d.exists():
-                                  files = [f.name for f in d.iterdir() if f.is_file()]
-                                  print(f"  {sub.name}/{d.name}/ ({len(files)} files): {files[:5]}{'...' if len(files) > 5 else ''}")
+          print(f"\nMain site-packages: {main_sp}")
+
+          # onnxruntime capi
+          capi = main_sp / "onnxruntime" / "capi"
+          if capi.exists():
+              dlls = [f.name for f in capi.iterdir() if f.suffix in ('.dll', '.so', '.pyd', '.dylib')]
+              print(f"\nonnxruntime/capi/ ({len(dlls)} binaries):")
+              for d in sorted(dlls):
+                  print(f"  {d}")
+              if any('cuda' in d.lower() for d in dlls):
+                  print("  ✓ CUDA providers found")
               else:
-                  variant = "${{ matrix.cuda_variant }}"
-                  if variant == "cuda_full":
-                      print("\n✗ ERROR: nvidia/ not found in cuda_full build! CUDA DLLs are missing!")
-                      sys.exit(1)
-                  else:
-                      print("\nnvidia/ not found (expected for cuda variant - user provides CUDA)")
+                  print("  ✗ WARNING: No CUDA provider DLLs")
+
+          # sherpa_onnx lib
+          sherpa_lib = main_sp / "sherpa_onnx" / "lib"
+          if sherpa_lib.exists():
+              dlls = [f.name for f in sherpa_lib.iterdir() if f.suffix in ('.dll', '.so', '.pyd', '.dylib')]
+              print(f"\nsherpa_onnx/lib/ ({len(dlls)} binaries):")
+              for d in sorted(dlls):
+                  print(f"  {d}")
+
+          # nvidia packages
+          nvidia_dir = main_sp / "nvidia"
+          if nvidia_dir.exists():
+              print(f"\nnvidia/ subdirectories:")
+              for sub in sorted(nvidia_dir.iterdir()):
+                  if sub.is_dir():
+                      for dname in ("bin", "lib"):
+                          d = sub / dname
+                          if d.exists():
+                              files = [f.name for f in d.iterdir() if f.is_file()]
+                              if files:
+                                  print(f"  {sub.name}/{dname}/ ({len(files)} files): {files[:5]}{'...' if len(files) > 5 else ''}")
+              print("  ✓ nvidia CUDA libraries found")
+          else:
+              variant = "${{ matrix.cuda_variant }}"
+              if variant == "cuda_full":
+                  print("\n✗ ERROR: nvidia/ not found in cuda_full build!")
+                  sys.exit(1)
+              else:
+                  print("\nnvidia/ not found (expected for cuda variant)")
 
       # ========== 打包产物 ==========
 
