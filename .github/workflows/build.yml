@@ -338,6 +338,48 @@ jobs:
                   copied += 1
           print(f"Copied {copied} DLLs to {capi.relative_to(build_root)}")
 
+          # 删除 nvidia/ 目录，DLL 已复制到 onnxruntime/capi/，不再需要
+          nvidia_dir = sp / "nvidia"
+          if nvidia_dir.is_dir():
+              shutil.rmtree(nvidia_dir)
+              print("Removed nvidia/ directory to avoid duplication")
+
+      # cudnn 依赖 zlibwapi.dll，NVIDIA Python 包不包含此文件，需要单独下载
+      - name: Download zlibwapi.dll (Windows cuda_full)
+        if: matrix.cuda_variant == 'cuda_full' && runner.os == 'Windows'
+        shell: python
+        run: |
+          from pathlib import Path
+          import urllib.request, zipfile, shutil
+
+          build_root = Path("build/windows")
+          capi_dirs = [p / "onnxruntime" / "capi" for p in build_root.rglob("site-packages") if (p / "onnxruntime" / "capi").is_dir()]
+          if not capi_dirs:
+              print("onnxruntime/capi not found, skip")
+              raise SystemExit(0)
+
+          capi = capi_dirs[0]
+          if (capi / "zlibwapi.dll").exists():
+              print("zlibwapi.dll already exists, skip")
+              raise SystemExit(0)
+
+          url = "http://www.winimage.com/zLibDll/zlib123dllx64.zip"
+          zip_path = Path("zlibwapi_temp.zip")
+          print(f"Downloading {url}...")
+          urllib.request.urlretrieve(url, zip_path)
+
+          with zipfile.ZipFile(zip_path) as z:
+              for name in z.namelist():
+                  if name.endswith("zlibwapi.dll"):
+                      z.extract(name, "zlibwapi_temp")
+                      src = Path("zlibwapi_temp") / name
+                      shutil.copy2(src, capi / "zlibwapi.dll")
+                      print(f"Copied zlibwapi.dll to {capi.relative_to(build_root)}")
+                      break
+
+          zip_path.unlink(missing_ok=True)
+          shutil.rmtree("zlibwapi_temp", ignore_errors=True)
+
       # ========== 验证 CUDA DLLs ==========
 
       - name: Verify CUDA libraries in build output
