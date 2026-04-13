@@ -83,6 +83,13 @@ jobs:
             arch: amd64
             artifact_ext: .tar.gz
             cuda_variant: cuda
+          # Linux CUDA Full 版（内置 CUDA 和 cuDNN）
+          - os: ubuntu-22.04
+            platform: Linux
+            flet_platform: linux
+            arch: amd64
+            artifact_ext: .tar.gz
+            cuda_variant: cuda_full
 
     runs-on: ${{ matrix.os }}
     
@@ -379,6 +386,42 @@ jobs:
 
           zip_path.unlink(missing_ok=True)
           shutil.rmtree("zlibwapi_temp", ignore_errors=True)
+
+      # cuda_full 版本（Linux）：复制 CUDA .so 到 onnxruntime/capi/ 并删除 nvidia/
+      - name: Copy CUDA libs and remove nvidia dir (Linux cuda_full)
+        if: matrix.cuda_variant == 'cuda_full' && runner.os == 'Linux'
+        shell: python
+        run: |
+          from pathlib import Path
+          import shutil
+
+          build_root = Path("build/linux")
+          sp_dirs = [sp for sp in build_root.rglob("site-packages") if (sp / "nvidia").is_dir()]
+          if not sp_dirs:
+              print("No site-packages with nvidia found, skip")
+              raise SystemExit(0)
+
+          sp = sp_dirs[0]
+          capi = sp / "onnxruntime" / "capi"
+          if not capi.is_dir():
+              print("onnxruntime/capi not found, skip")
+              raise SystemExit(0)
+
+          cuda_libs = list((sp / "nvidia").rglob("*.so*"))
+          print(f"Found {len(cuda_libs)} CUDA libs in nvidia/")
+
+          copied = 0
+          for lib in cuda_libs:
+              dest = capi / lib.name
+              if not dest.exists():
+                  shutil.copy2(lib, dest)
+                  copied += 1
+          print(f"Copied {copied} libs to {capi.relative_to(build_root)}")
+
+          nvidia_dir = sp / "nvidia"
+          if nvidia_dir.is_dir():
+              shutil.rmtree(nvidia_dir)
+              print("Removed nvidia/ directory to avoid duplication")
 
       # ========== 验证 CUDA DLLs ==========
 
