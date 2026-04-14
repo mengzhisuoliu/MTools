@@ -16,8 +16,10 @@ dependencies = [
   "chardet==5.2.0",
   "opencv-python-headless==4.11.0.86",
   "numpy==1.26.4",
-  # ONNX Runtime - 自动根据平台选择合适的版本
-  "onnxruntime>=1.23.0",
+  # ONNX Runtime - Windows 用 DirectML (GPU), 其他平台用 CPU
+  # CUDA 构建时由 prepare_cuda_variant.py 替换为 onnxruntime-gpu
+  "onnxruntime-directml>=1.23.0 ; sys_platform == 'win32'",
+  "onnxruntime>=1.23.0 ; sys_platform != 'win32'",
   "websockets==12.0", # 避免弃用警告，等待 flet 更新
   "qrcode[pil]==7.4.2",
   "sherpa-onnx==1.12.35",
