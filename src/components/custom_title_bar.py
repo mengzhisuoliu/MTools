@@ -429,7 +429,7 @@ class CustomTitleBar(ft.Container):
             tooltip="切换主题",
             on_click=self._toggle_theme,
             style=ft.ButtonStyle(
-                padding=10,
+                padding=4 if is_mac else 10,
             ),
         )
         
@@ -442,6 +442,7 @@ class CustomTitleBar(ft.Container):
                 controls=[self.weather_container, self.theme_icon],
                 spacing=0,
                 alignment=ft.MainAxisAlignment.END,
+                vertical_alignment=ft.CrossAxisAlignment.CENTER,
             )
 
             title_bar_content = ft.Row(
@@ -499,7 +500,17 @@ class CustomTitleBar(ft.Container):
         # ── 配置容器属性 ──
         self.content = title_bar_content
         self.height = 34 if is_mac else 42
-        self.padding = ft.Padding.symmetric(horizontal=PADDING_MEDIUM)
+        if is_mac:
+            from utils.file_utils import is_packaged_app
+            # flet build 产物的 NSWindow 交通灯位置比 flet run 偏高，
+            # 需要额外 bottom padding 将内容上移以对齐（仅编译后生效）
+            # mac_bottom = 4 if is_packaged_app() else 0
+            mac_bottom = 0
+            self.padding = ft.Padding.only(
+                left=PADDING_MEDIUM, right=PADDING_MEDIUM, bottom=mac_bottom
+            )
+        else:
+            self.padding = ft.Padding.symmetric(horizontal=PADDING_MEDIUM)
         self.gradient = self._create_gradient()
         self.bgcolor = ft.Colors.with_opacity(0.95, self.theme_color)
         self.gradient = None
