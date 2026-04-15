@@ -199,38 +199,6 @@ def _setup_library_paths():
             if lib_path_str not in os.environ.get('PATH', ''):
                 os.environ['PATH'] = lib_path_str + os.pathsep + os.environ.get('PATH', '')
 
-        # ── 预加载 ORT 核心 DLL（DirectML / CUDA，打包环境需要）──
-        # onnxruntime 的 LoadLibraryExW 在打包环境下可能找不到依赖 DLL，
-        # 提前用 ctypes.CDLL 加载到进程内存可以解决此问题。
-        # 顺序至关重要：底层依赖必须先加载（CRT → providers_shared → onnxruntime）
-        import ctypes
-        _preload_names = [
-            # C++ 运行时（onnxruntime.dll 的底层依赖）
-            "vcruntime140.dll",
-            "vcruntime140_1.dll",
-            "msvcp140.dll",
-            # CUDA 运行时（必须在 onnxruntime 之前）
-            "cudart64_12.dll", "cublasLt64_12.dll", "cublas64_12.dll",
-            "cufft64_11.dll", "curand64_10.dll", "zlibwapi.dll",
-            "cudnn64_9.dll", "cudnn_ops64_9.dll", "cudnn_adv64_9.dll",
-            "cudnn_cnn64_9.dll", "cudnn_graph64_9.dll", "cudnn_heuristic64_9.dll",
-            "cudnn_engines_precompiled64_9.dll", "cudnn_engines_runtime_compiled64_9.dll",
-            # DirectML（Windows 标准版）
-            "DirectML.dll",
-            # ORT 核心（按依赖顺序：shared → main）
-            "onnxruntime_providers_shared.dll",
-            "onnxruntime.dll",
-        ]
-        for _name in _preload_names:
-            for _lp in lib_paths:
-                _fp = _lp / _name
-                if _fp.is_file():
-                    try:
-                        ctypes.CDLL(str(_fp))
-                        _diag(f"预加载 DLL 成功: {_name} (from {_lp})")
-                    except Exception as _e:
-                        _diag(f"预加载 DLL 失败: {_name} (from {_lp}) - {_e}")
-                    break
 
     elif system == "Linux":
         ld_path = os.environ.get('LD_LIBRARY_PATH', '')
