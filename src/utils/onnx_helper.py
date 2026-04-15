@@ -34,13 +34,18 @@
 from pathlib import Path
 from typing import Optional, Tuple, List, Union, TYPE_CHECKING, Any, Dict
 
-try:
-    import onnxruntime as ort
-except ImportError:
-    ort = None
-
 if TYPE_CHECKING:
+    import onnxruntime as ort
     from services import ConfigService
+
+
+def _get_ort():
+    """延迟导入 onnxruntime，避免模块加载时 DLL 路径未就绪导致的导入失败。"""
+    try:
+        import onnxruntime as _ort
+        return _ort
+    except ImportError:
+        return None
 
 
 # 缓存检测到的 Provider 类型，避免重复检测
@@ -119,6 +124,7 @@ def get_primary_provider() -> str:
     if _cached_provider_type is not None:
         return _cached_provider_type
     
+    ort = _get_ort()
     if ort is None:
         _cached_provider_type = "CPU"
         return _cached_provider_type
@@ -239,6 +245,7 @@ def create_session_options(
     Returns:
         配置好的SessionOptions对象
     """
+    ort = _get_ort()
     if ort is None:
         raise ImportError("需要安装 onnxruntime 库")
     
@@ -303,6 +310,7 @@ def create_provider_options(
     Returns:
         Provider列表
     """
+    ort = _get_ort()
     if ort is None:
         raise ImportError("需要安装 onnxruntime 库")
     
@@ -456,6 +464,7 @@ def create_onnx_session_config(
         ...     providers=providers
         ... )
     """
+    ort = _get_ort()
     if ort is None:
         raise ImportError("需要安装 onnxruntime 库")
     
@@ -567,6 +576,7 @@ def create_onnx_session(
         ...     execution_mode="parallel"
         ... )
     """
+    ort = _get_ort()
     if ort is None:
         raise ImportError("需要安装 onnxruntime 库")
     
