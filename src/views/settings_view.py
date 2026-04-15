@@ -2126,6 +2126,8 @@ class SettingsView(ft.Container):
         """检查是否为编译后的版本（支持 Nuitka 和 flet build）。"""
         if getattr(sys, 'frozen', False):
             return True
+        if os.environ.get("FLET_ASSETS_DIR") or os.environ.get("FLET_APP_CONSOLE"):
+            return True
         if os.environ.get("SERIOUS_PYTHON_SITE_PACKAGES"):
             return True
         exe_name = os.path.basename(sys.executable).lower()

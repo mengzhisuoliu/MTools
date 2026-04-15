@@ -24,6 +24,7 @@ def is_packaged_app() -> bool:
     
     检测方式（满足任一即为打包环境）：
     - Nuitka / PyInstaller: sys.frozen == True
+    - flet build: FLET_ASSETS_DIR 或 FLET_APP_CONSOLE 环境变量已设置（Flet 官方生产模式标记）
     - flet build (serious_python): SERIOUS_PYTHON_SITE_PACKAGES 环境变量已设置
     - Windows: sys.argv[0] 以 .exe 结尾
     - macOS: 可执行文件位于 .app bundle 内
@@ -32,6 +33,8 @@ def is_packaged_app() -> bool:
         如果是打包的程序返回 True，否则返回 False
     """
     if getattr(sys, 'frozen', False):
+        return True
+    if os.environ.get("FLET_ASSETS_DIR") or os.environ.get("FLET_APP_CONSOLE"):
         return True
     if os.environ.get("SERIOUS_PYTHON_SITE_PACKAGES"):
         return True

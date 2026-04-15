@@ -62,6 +62,8 @@ def _setup_library_paths():
 
     _diag(f"开始设置库路径 (平台: {system})")
     _diag(f"SERIOUS_PYTHON_SITE_PACKAGES={os.environ.get('SERIOUS_PYTHON_SITE_PACKAGES', '<未设置>')}")
+    _diag(f"FLET_ASSETS_DIR={os.environ.get('FLET_ASSETS_DIR', '<未设置>')}")
+    _diag(f"FLET_APP_CONSOLE={os.environ.get('FLET_APP_CONSOLE', '<未设置>')}")
     _diag(f"sys.argv[0]={sys.argv[0] if sys.argv else '<空>'}")
     _diag(f"sys.executable={sys.executable}")
 

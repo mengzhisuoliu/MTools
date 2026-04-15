@@ -39,6 +39,10 @@ def _is_packaged_app() -> bool:
     if getattr(sys, 'frozen', False):
         return True
     
+    # flet build 生产模式设置的官方环境变量
+    if os.environ.get("FLET_ASSETS_DIR") or os.environ.get("FLET_APP_CONSOLE"):
+        return True
+    
     # flet build 使用 serious_python 嵌入 Python，会设置此环境变量
     if os.environ.get("SERIOUS_PYTHON_SITE_PACKAGES"):
         return True
