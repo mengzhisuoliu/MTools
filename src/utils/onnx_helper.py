@@ -39,12 +39,20 @@ if TYPE_CHECKING:
     from services import ConfigService
 
 
+_ort_import_error: str = ""
+
+
 def _get_ort():
     """延迟导入 onnxruntime，避免模块加载时 DLL 路径未就绪导致的导入失败。"""
+    global _ort_import_error
     try:
         import onnxruntime as _ort
+        _ort_import_error = ""
         return _ort
-    except ImportError:
+    except Exception as e:
+        _ort_import_error = f"{type(e).__name__}: {e}"
+        import logging
+        logging.getLogger(__name__).warning("onnxruntime 导入失败: %s", _ort_import_error)
         return None
 
 
@@ -247,7 +255,7 @@ def create_session_options(
     """
     ort = _get_ort()
     if ort is None:
-        raise ImportError("需要安装 onnxruntime 库")
+        raise ImportError(f"需要安装 onnxruntime 库 ({_ort_import_error})" if _ort_import_error else "需要安装 onnxruntime 库")
     
     sess_options = ort.SessionOptions()
     
@@ -312,7 +320,7 @@ def create_provider_options(
     """
     ort = _get_ort()
     if ort is None:
-        raise ImportError("需要安装 onnxruntime 库")
+        raise ImportError(f"需要安装 onnxruntime 库 ({_ort_import_error})" if _ort_import_error else "需要安装 onnxruntime 库")
     
     # 如果提供了config_service，优先读取gpu_acceleration配置
     if config_service is not None:
@@ -466,7 +474,7 @@ def create_onnx_session_config(
     """
     ort = _get_ort()
     if ort is None:
-        raise ImportError("需要安装 onnxruntime 库")
+        raise ImportError(f"需要安装 onnxruntime 库 ({_ort_import_error})" if _ort_import_error else "需要安装 onnxruntime 库")
     
     # 从配置服务读取参数（如果提供且参数为None）
     if config_service is not None:
@@ -578,7 +586,7 @@ def create_onnx_session(
     """
     ort = _get_ort()
     if ort is None:
-        raise ImportError("需要安装 onnxruntime 库")
+        raise ImportError(f"需要安装 onnxruntime 库 ({_ort_import_error})" if _ort_import_error else "需要安装 onnxruntime 库")
     
     if not model_path.exists():
         raise FileNotFoundError(f"模型文件不存在: {model_path}")

@@ -102,9 +102,20 @@ class Logger:
         if self._file_logging_enabled:
             return
         
-        # 创建日志目录
-        log_dir = Path('logs')
-        log_dir.mkdir(exist_ok=True)
+        # 使用固定的、跨平台的日志目录（打包后 cwd 不可控）
+        import os
+        if os.name == 'nt':
+            base = Path(os.environ.get("APPDATA", ""))
+            if not base.exists():
+                base = Path.home()
+            log_dir = base / "MTools" / "logs"
+        else:
+            log_dir = Path.home() / ".local" / "share" / "MTools" / "logs"
+        try:
+            log_dir.mkdir(parents=True, exist_ok=True)
+        except Exception:
+            log_dir = Path('logs')
+            log_dir.mkdir(exist_ok=True)
         
         # 文件格式化器
         file_formatter = logging.Formatter(

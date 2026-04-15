@@ -2083,7 +2083,12 @@ class SettingsView(ft.Container):
             # 立即启用或禁用文件日志
             if enabled:
                 logger.enable_file_logging()
-                self._show_snackbar("日志保存已启用，日志文件将保存到 logs 目录", ft.Colors.GREEN)
+                import os
+                if os.name == 'nt':
+                    log_path = os.path.join(os.environ.get("APPDATA", ""), "MTools", "logs")
+                else:
+                    log_path = os.path.join(str(Path.home()), ".local", "share", "MTools", "logs")
+                self._show_snackbar(f"日志保存已启用，日志文件: {log_path}", ft.Colors.GREEN)
             else:
                 logger.disable_file_logging()
                 self._show_snackbar("日志保存已禁用", ft.Colors.GREEN)
