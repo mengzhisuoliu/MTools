@@ -199,6 +199,35 @@ def _setup_library_paths():
             if lib_path_str not in os.environ.get('PATH', ''):
                 os.environ['PATH'] = lib_path_str + os.pathsep + os.environ.get('PATH', '')
 
+        # ── 预加载 ORT 核心 DLL ──────────────────────────────────────────
+        # 在 serious_python 嵌入式环境中，os.add_dll_directory() 对 .pyd 文件的
+        # 间接依赖加载不生效（LOAD_LIBRARY_SEARCH_DEFAULT_DIRS 上下文不继承）。
+        # 必须用 ctypes.CDLL 按绝对路径预加载，使 DLL 进入进程模块缓存。
+        #
+        # ctypes.CDLL(绝对路径) 加载时，Windows 将该 DLL 所在目录（capi/）加入本次
+        # 搜索路径，所以 onnxruntime.dll 的所有依赖（DirectML、cudart、cublas 等）
+        # 都会从 capi/ 中被自动找到——不需要逐个预加载这些大型 DLL。
+        #
+        # 加载顺序：providers_shared → providers_cuda（可选）→ onnxruntime
+        #   providers_cuda 会传递加载 CUDA/cuDNN DLL（仅 CUDA 构建中存在，
+        #   DirectML 构建中不存在该文件，自动跳过）
+        import ctypes as _ctypes
+        _ort_preload = [
+            "onnxruntime_providers_shared.dll",   # 所有构建都需要
+            "onnxruntime_providers_cuda.dll",      # CUDA 构建；不存在则跳过
+            "onnxruntime.dll",                     # 核心，最后加载
+        ]
+        for _name in _ort_preload:
+            for _lp in lib_paths:
+                _fp = _lp / _name
+                if _fp.is_file():
+                    try:
+                        _ctypes.CDLL(str(_fp))
+                        _diag(f"ORT 核心 DLL 已加载: {_name}")
+                    except Exception as _e:
+                        _diag(f"ORT 核心 DLL 加载失败: {_name} - {_e}")
+                    break
+
 
     elif system == "Linux":
         ld_path = os.environ.get('LD_LIBRARY_PATH', '')
