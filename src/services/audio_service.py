@@ -10,6 +10,7 @@ from typing import List, Optional, Tuple
 
 import ffmpeg
 
+from services.ffmpeg_service import _decode_ffmpeg_stderr
 from utils import format_file_size
 
 
@@ -111,7 +112,7 @@ class AudioService:
             
             return {'error': '无法读取音频信息'}
         except ffmpeg.Error as e:
-            return {'error': f'FFmpeg错误: {e.stderr.decode() if e.stderr else str(e)}'}
+            return {'error': f'FFmpeg错误: {_decode_ffmpeg_stderr(e.stderr) if e.stderr else str(e)}'}
         except Exception as e:
             return {'error': str(e)}
     
@@ -203,7 +204,7 @@ class AudioService:
                 return True, f"转换成功: {input_size_str} → {output_size_str}"
         
         except ffmpeg.Error as e:
-            error_msg = e.stderr.decode() if e.stderr else str(e)
+            error_msg = _decode_ffmpeg_stderr(e.stderr) if e.stderr else str(e)
             return False, f"转换失败: {error_msg}"
         except Exception as e:
             return False, f"转换失败: {str(e)}"

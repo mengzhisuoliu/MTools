@@ -18,6 +18,25 @@ import re
 from utils.file_utils import get_app_root
 
 
+def _decode_ffmpeg_stderr(stderr: Optional[bytes]) -> str:
+    """宽松解码 ffmpeg 的 stderr 字节流。
+
+    Windows 中文系统下 ffmpeg 可能输出 GBK 编码的字符，直接 utf-8 严格解码会
+    触发 UnicodeDecodeError，把真正的 ffmpeg 错误原因盖掉。这里先试 utf-8，
+    失败再试 gbk，最后回退到 utf-8 忽略非法字节，确保任何情况下都能拿到可读文本。
+    """
+    if not stderr:
+        return ""
+    if isinstance(stderr, str):
+        return stderr
+    for enc in ("utf-8", "gbk"):
+        try:
+            return stderr.decode(enc)
+        except UnicodeDecodeError:
+            continue
+    return stderr.decode("utf-8", errors="replace")
+
+
 class FFmpegService:
     """FFmpeg 安装和管理服务类。
     
@@ -967,7 +986,7 @@ class FFmpegService:
             return True, "压缩成功"
 
         except ffmpeg.Error as e:
-            return False, f"FFmpeg 错误: {e.stderr.decode()}"
+            return False, f"FFmpeg 错误: {_decode_ffmpeg_stderr(e.stderr)}"
         except Exception as e:
             return False, f"压缩失败: {e}"
 
@@ -1435,7 +1454,7 @@ class FFmpegService:
             return True, "速度调整成功"
         
         except ffmpeg.Error as e:
-            return False, f"FFmpeg 错误: {e.stderr.decode()}"
+            return False, f"FFmpeg 错误: {_decode_ffmpeg_stderr(e.stderr)}"
         except Exception as e:
             return False, f"速度调整失败: {str(e)}"
 
@@ -1592,7 +1611,7 @@ class FFmpegService:
             return True, "速度调整成功"
         
         except ffmpeg.Error as e:
-            return False, f"FFmpeg 错误: {e.stderr.decode()}"
+            return False, f"FFmpeg 错误: {_decode_ffmpeg_stderr(e.stderr)}"
         except Exception as e:
             return False, f"音频速度调整失败: {str(e)}"
 
@@ -1820,7 +1839,7 @@ class FFmpegService:
             return True, f"视频修复成功（模式: {repair_mode}）"
         
         except ffmpeg.Error as e:
-            return False, f"FFmpeg 错误: {e.stderr.decode()[:200]}"
+            return False, f"FFmpeg 错误: {_decode_ffmpeg_stderr(e.stderr)[:200]}"
         except Exception as e:
             return False, f"视频修复失败: {str(e)}"
 

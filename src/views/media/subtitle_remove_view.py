@@ -1952,8 +1952,8 @@ class SubtitleRemoveView(ft.Container):
                 self._pending_progress = (1.0, "处理完成！")
                 
             except Exception as e:
-                logger.error(f"处理失败: {e}", exc_info=True)
-                self._pending_progress = (None, f"处理失败: {str(e)}")
+                logger.error(f"处理失败: {type(e).__name__}: {e}", exc_info=True)
+                self._pending_progress = (None, f"处理失败（{type(e).__name__}）: {str(e)}")
                 self._process_error = True
             finally:
                 # 确保清理临时文件

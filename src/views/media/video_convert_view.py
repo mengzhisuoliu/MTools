@@ -19,6 +19,7 @@ from constants import (
     PADDING_XLARGE,
 )
 from services import ConfigService, FFmpegService
+from services.ffmpeg_service import _decode_ffmpeg_stderr
 from utils import format_file_size, logger, get_unique_path
 from utils.file_utils import pick_files, get_directory_path
 from views.media.ffmpeg_install_view import FFmpegInstallView
@@ -908,7 +909,7 @@ class VideoConvertView(ft.Container):
             return True, "转换成功"
             
         except ffmpeg.Error as e:
-            return False, f"FFmpeg 错误: {e.stderr.decode()}"
+            return False, f"FFmpeg 错误: {_decode_ffmpeg_stderr(e.stderr)}"
         except Exception as e:
             return False, f"转换失败: {str(e)}"
     

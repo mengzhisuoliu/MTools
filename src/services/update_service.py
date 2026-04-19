@@ -268,53 +268,83 @@ class UpdateService:
     
     @staticmethod
     def parse_version(version_str: str) -> Tuple[int, ...]:
-        """解析版本号字符串为可比较的元组。
-        
+        """解析版本号字符串为主版本号元组（仅供展示/兼容）。
+
+        仅返回主版本号的数字部分（不含预发布标签），用于简单场景的展示或兼容
+        旧代码。真正的版本比较请统一走 :meth:`compare_versions`，它会按 PEP 440
+        / SemVer 规则正确处理 ``-beta`` / ``-rc`` 等预发布后缀。
+
         支持格式：v1.0.0, 1.0.0, 1.0, 1.0.0-beta 等
-        
+
         Args:
             version_str: 版本号字符串
-        
+
         Returns:
-            版本号元组，例如 (1, 0, 0)
+            版本号元组，例如 (1, 0, 0)。对于 ``1.0.0-beta``，仍然返回 (1, 0, 0)。
         """
-        # 移除开头的 'v' 或 'V'
         version_str = version_str.lstrip('vV')
-        
-        # 移除预发布标签（如 -beta, -alpha, -rc1 等）
+        # 去掉预发布 / 构建标签
         version_str = re.split(r'[-+]', version_str)[0]
-        
-        # 分割版本号并转换为整数
         parts = version_str.split('.')
         return tuple(int(part) for part in parts if part.isdigit())
-    
+
     @staticmethod
     def compare_versions(version1: str, version2: str) -> int:
-        """比较两个版本号。
-        
+        """按 PEP 440 规则比较两个版本号，正确处理预发布后缀。
+
+        规则要点：
+            - ``0.0.17-beta < 0.0.17``（预发布小于同号正式版）
+            - ``0.0.17 < 0.0.18``（主版本号递增）
+            - ``0.0.17-beta.1 < 0.0.17-beta.2``（预发布序号递增）
+            - ``0.0.17-alpha < 0.0.17-beta < 0.0.17-rc < 0.0.17``
+
+        这样装了 ``0.0.17-beta`` 的测试版用户在正式版 ``0.0.17`` 发布后，能被
+        正确识别为"有更新可用"，收到升级提示。
+
+        无法解析的版本号（例如完全非法的字符串）回退到旧的元组比较逻辑，
+        保证不会因为版本号格式异常导致崩溃。
+
         Args:
             version1: 第一个版本号
             version2: 第二个版本号
-        
+
         Returns:
             -1: version1 < version2
              0: version1 == version2
              1: version1 > version2
         """
-        v1 = UpdateService.parse_version(version1)
-        v2 = UpdateService.parse_version(version2)
-        
-        # 补齐版本号长度
-        max_len = max(len(v1), len(v2))
-        v1 = v1 + (0,) * (max_len - len(v1))
-        v2 = v2 + (0,) * (max_len - len(v2))
-        
+        # 使用 packaging.version 进行 PEP 440 兼容的比较。packaging 是 pip /
+        # setuptools / uv 的基础依赖，环境中必定存在，无需新增依赖。
+        def _normalize(raw: str) -> str:
+            # 去掉 v/V 前缀；把我们约定的 -test.N SemVer 后缀映射成 PEP 440
+            # 的 .devN（语义：开发版，排在同号正式版之前），让 packaging 能识别。
+            s = raw.lstrip('vV')
+            s = re.sub(r'-test\.?(\d+)?', lambda m: f'.dev{m.group(1) or 0}', s)
+            return s
+
+        try:
+            from packaging.version import InvalidVersion, Version
+
+            v1 = Version(_normalize(version1))
+            v2 = Version(_normalize(version2))
+        except (ImportError, InvalidVersion):
+            # 回退：旧的主版本号元组比较（丢失预发布信息，但至少能比）
+            t1 = UpdateService.parse_version(version1)
+            t2 = UpdateService.parse_version(version2)
+            max_len = max(len(t1), len(t2))
+            t1 = t1 + (0,) * (max_len - len(t1))
+            t2 = t2 + (0,) * (max_len - len(t2))
+            if t1 < t2:
+                return -1
+            if t1 > t2:
+                return 1
+            return 0
+
         if v1 < v2:
             return -1
-        elif v1 > v2:
+        if v1 > v2:
             return 1
-        else:
-            return 0
+        return 0
     
     def check_update(self) -> UpdateInfo:
         """检查更新。

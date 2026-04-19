@@ -19,6 +19,7 @@ from constants import (
     PADDING_XLARGE,
 )
 from services import ConfigService, FFmpegService
+from services.ffmpeg_service import _decode_ffmpeg_stderr
 from utils import format_file_size, logger, get_unique_path
 from utils.file_utils import pick_files, get_directory_path
 from views.media.ffmpeg_install_view import FFmpegInstallView
@@ -668,7 +669,7 @@ class AudioCompressView(ft.Container):
             return True
             
         except ffmpeg.Error as e:
-            logger.error(f"压缩音频失败: {e.stderr.decode() if e.stderr else str(e)}")
+            logger.error(f"压缩音频失败: {_decode_ffmpeg_stderr(e.stderr) if e.stderr else str(e)}")
             return False
         except Exception as e:
             logger.error(f"压缩音频失败: {e}")
