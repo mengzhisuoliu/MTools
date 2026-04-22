@@ -642,36 +642,50 @@ def create_desktop_shortcut() -> Tuple[bool, str]:
         if shortcut_path.exists():
             return False, "桌面快捷方式已存在"
         
-        # 获取程序路径和图标
-        exe_path = Path(sys.argv[0]).resolve()
+        # 获取真实的主程序 exe 路径。
+        # 注意：在 flet build 打包环境下 sys.argv[0] 是内嵌 python 的入口
+        # 脚本路径（.../flet/app/src/main.py），不是用户看到的 MTools.exe。
+        # 用它作为快捷方式目标会导致 .lnk 目标无效，甚至在某些 Windows
+        # Shell 版本下产生诡异的副作用（比如在桌面创建 flet/app 空目录）。
+        from utils.platform_utils import get_real_executable_path
+        exe_path = get_real_executable_path().resolve()
         app_dir = exe_path.parent
         
-        # 查找图标
+        # 查找图标（基于真实 exe 所在目录，而不是入口脚本目录）
         icon_path = None
-        for icon_name in ["icon.ico", "assets/icon.ico", "src/assets/icon.ico"]:
+        for icon_name in ["icon.ico", "assets/icon.ico", "data/flutter_assets/assets/icon.ico"]:
             test_path = app_dir / icon_name
             if test_path.exists():
                 icon_path = test_path
                 break
         
-        # 使用 PowerShell 创建快捷方式
-        ps_script = f"""
-$WshShell = New-Object -ComObject WScript.Shell
-$Shortcut = $WshShell.CreateShortcut("{shortcut_path}")
-$Shortcut.TargetPath = "{exe_path}"
-$Shortcut.WorkingDirectory = "{app_dir}"
-$Shortcut.Description = "MTools"
-"""
+        # 使用 PowerShell 创建快捷方式。
+        # 路径里的反斜杠和 PowerShell 双引号插值不冲突，但我们显式把路径
+        # 标准化为 Windows 分隔符，避免有 / 导致 CreateShortcut 解析异常。
+        def _win(p: Path) -> str:
+            return str(p).replace('/', '\\')
+
+        ps_script = (
+            "$WshShell = New-Object -ComObject WScript.Shell\n"
+            f'$Shortcut = $WshShell.CreateShortcut("{_win(shortcut_path)}")\n'
+            f'$Shortcut.TargetPath = "{_win(exe_path)}"\n'
+            f'$Shortcut.WorkingDirectory = "{_win(app_dir)}"\n'
+            '$Shortcut.Description = "MTools"\n'
+        )
         if icon_path:
-            ps_script += f'$Shortcut.IconLocation = "{icon_path}"\n'
+            ps_script += f'$Shortcut.IconLocation = "{_win(icon_path)}"\n'
         ps_script += "$Shortcut.Save()"
-        
-        # 执行 PowerShell 命令
+
+        logger.debug(f"创建快捷方式参数: target={exe_path}, workdir={app_dir}, icon={icon_path}")
+
+        # 执行 PowerShell 命令（显式指定 cwd 到 app_dir，避免继承到桌面 cwd
+        # 触发某些 Shell 边缘行为）
         result = subprocess.run(
-            ["powershell", "-Command", ps_script],
+            ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", ps_script],
             capture_output=True,
             text=True,
-            timeout=10
+            timeout=10,
+            cwd=str(app_dir) if app_dir.exists() else None,
         )
         
         if result.returncode == 0:

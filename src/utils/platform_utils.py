@@ -403,6 +403,82 @@ def get_available_compute_devices() -> Dict[str, List[Dict]]:
     return result
 
 
+def get_real_executable_path():
+    """获取真实的主程序可执行文件路径。
+
+    在 ``flet build`` 打包的应用里，``sys.executable`` 指向的是
+    serious_python 嵌入的 Python 解释器（例如 ``python312.exe``），而
+    不是用户看到的 ``MTools.exe``。``sys.argv[0]`` 同理，指向内部
+    入口脚本 ``.../flet/app/src/main.py``，也不可用。
+
+    本函数返回当前进程真正的启动可执行文件路径，优先顺序：
+
+    1. Windows: ``GetModuleFileNameW(NULL)`` 直接向内核取当前进程 exe
+    2. macOS: ``NSBundle.mainBundle().executablePath``
+    3. ``SERIOUS_PYTHON_SITE_PACKAGES`` 的父目录下第一个非 python/flet 的 ``.exe``
+    4. 兜底返回 ``Path(sys.executable)``
+
+    Returns:
+        Path: 真实的 exe 路径（在打包/开发环境下都尽量返回合理值）
+    """
+    from pathlib import Path
+    import os
+
+    # 方式 1: Windows API 直接取当前进程 exe
+    if sys.platform == "win32":
+        try:
+            import ctypes
+            from ctypes import wintypes
+
+            kernel32 = ctypes.windll.kernel32
+            GetModuleFileNameW = kernel32.GetModuleFileNameW
+            GetModuleFileNameW.argtypes = [wintypes.HMODULE, wintypes.LPWSTR, wintypes.DWORD]
+            GetModuleFileNameW.restype = wintypes.DWORD
+
+            # 使用 32K 缓冲以支持长路径，避免 MAX_PATH 限制
+            buf = ctypes.create_unicode_buffer(32768)
+            length = GetModuleFileNameW(None, buf, len(buf))
+            if length > 0:
+                p = Path(buf.value)
+                if p.exists():
+                    return p
+        except Exception:
+            pass
+
+    # 方式 2: macOS NSBundle
+    if sys.platform == "darwin":
+        try:
+            from Foundation import NSBundle  # type: ignore
+            exe = NSBundle.mainBundle().executablePath()
+            if exe:
+                p = Path(str(exe))
+                if p.exists():
+                    return p
+        except Exception:
+            pass
+
+    # 方式 3: serious_python 环境变量兜底
+    sp = os.environ.get("SERIOUS_PYTHON_SITE_PACKAGES")
+    if sp:
+        app_root = Path(sp).parent
+        if app_root.is_dir():
+            # 排除 python 解释器、flet runtime 等已知非主程序可执行文件
+            excluded = {
+                "python.exe", "pythonw.exe", "python3.exe", "python312.exe",
+                "python311.exe", "python310.exe",
+                "flet.exe", "fletd.exe",
+            }
+            try:
+                for candidate in sorted(app_root.glob("*.exe")):
+                    if candidate.name.lower() not in excluded:
+                        return candidate
+            except Exception:
+                pass
+
+    # 方式 4: 兜底
+    return Path(sys.executable)
+
+
 def is_admin() -> bool:
     """检测当前程序是否以管理员/root 身份运行。
     
@@ -439,21 +515,34 @@ def request_admin_restart() -> bool:
     
     try:
         import ctypes
-        
-        # 获取当前可执行文件路径
-        executable = sys.executable
-        
-        # 获取命令行参数
-        if hasattr(sys, 'argv') and sys.argv:
-            # 如果是打包的应用，使用可执行文件本身
-            if getattr(sys, 'frozen', False):
-                params = ' '.join(sys.argv[1:]) if len(sys.argv) > 1 else ''
-            else:
-                # 开发环境，需要包含脚本路径
-                params = ' '.join(sys.argv)
-        else:
+        import os
+        from pathlib import Path
+
+        # 在 flet build 环境下 sys.executable 指向嵌入的 python.exe，不是
+        # 用户看到的 MTools.exe。必须拿到真实的主程序 exe，UAC 重启才会
+        # 启动 MTools 本身而不是一个裸的 python 解释器。
+        exe_path = get_real_executable_path()
+        executable = str(exe_path)
+
+        # 打包环境下直接以可执行文件重启，不传任何参数（flet build 下
+        # sys.argv 是内部 .py 入口路径，传给 exe 反而会让它尝试把脚本
+        # 路径当作参数解析，失败）。
+        is_packaged = (
+            getattr(sys, 'frozen', False)
+            or os.environ.get("FLET_ASSETS_DIR")
+            or os.environ.get("FLET_APP_CONSOLE")
+            or os.environ.get("SERIOUS_PYTHON_SITE_PACKAGES")
+            or exe_path.suffix.lower() == '.exe'
+        )
+        if is_packaged:
             params = ''
-        
+        else:
+            # 开发环境：保留原有行为
+            params = ' '.join(sys.argv) if getattr(sys, 'argv', None) else ''
+
+        # 工作目录指向 exe 所在目录，避免 cwd 继承到奇怪路径
+        working_dir = str(exe_path.parent) if exe_path.parent.exists() else None
+
         # 使用 ShellExecuteW 请求提权运行
         # 参数: hwnd, operation, file, params, directory, show
         ret = ctypes.windll.shell32.ShellExecuteW(
@@ -461,19 +550,18 @@ def request_admin_restart() -> bool:
             "runas",        # 请求管理员权限
             executable,     # 可执行文件
             params,         # 参数
-            None,           # 工作目录
+            working_dir,    # 工作目录
             1               # SW_SHOWNORMAL
         )
-        
+
         # ShellExecuteW 返回值 > 32 表示成功
         if ret > 32:
             # 成功启动新进程，退出当前进程
-            import os
             os._exit(0)
             return True
         else:
             return False
-            
+
     except Exception:
         return False
 

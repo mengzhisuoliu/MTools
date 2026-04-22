@@ -188,7 +188,10 @@ class AutoUpdater:
         try:
             # 获取当前应用目录
             if _is_packaged_app():
-                app_dir = Path(sys.executable).parent
+                # 在 flet build 下 sys.executable 指向内嵌 python.exe，
+                # 必须用 get_real_executable_path() 取真正的 MTools.exe
+                from utils.platform_utils import get_real_executable_path
+                app_dir = get_real_executable_path().parent
                 # macOS: 向上找到 .app bundle 根目录
                 if sys.platform == "darwin":
                     app_dir = self._find_macos_app_bundle()
@@ -307,7 +310,14 @@ class AutoUpdater:
         # 定位主程序 exe 和实际源目录
         # flet build 产物的 app_packages/ 下可能包含第三方 .exe，
         # 因此优先按名称精确匹配，避免误选。
-        expected_name = Path(sys.executable).name if _is_packaged_app() else "MTools.exe"
+        # 注意：在 flet build 下 sys.executable 是内嵌的 python.exe，
+        # 用它的 name 会把 "python312.exe" 当作主程序去找，完全错位。
+        # 必须用 get_real_executable_path() 拿到真正的 MTools.exe。
+        if _is_packaged_app():
+            from utils.platform_utils import get_real_executable_path
+            expected_name = get_real_executable_path().name
+        else:
+            expected_name = "MTools.exe"
         
         main_exe = self._find_main_exe(source_dir, expected_name)
         
@@ -325,33 +335,40 @@ class AutoUpdater:
         # 获取所有需要终止的进程名
         # 对于 Flet 应用，需要同时终止主程序和 flet.exe
         process_names = set()
-        
+
+        # 先把真实 exe 名加进去（最重要），避免 psutil 拿到的是内嵌
+        # python.exe 而漏掉真正的 MTools.exe 主进程
+        process_names.add(expected_name)
+
         if HAS_PSUTIL:
             try:
                 current_process = psutil.Process()
                 # 添加当前进程名
                 process_names.add(current_process.name())
-                
+
                 # 获取所有子进程（Flet 渲染进程等）
                 for child in current_process.children(recursive=True):
                     process_names.add(child.name())
-                
-                # 如果当前进程有父进程，也添加父进程名（可能是 flet.exe）
+
+                # 如果当前进程有父进程，也添加父进程名
+                # （flet build 下 python.exe 的父进程通常就是 MTools.exe）
                 try:
                     parent_process = current_process.parent()
-                    if parent_process and parent_process.name().lower() in ['flet.exe', 'pythonw.exe', 'python.exe']:
-                        process_names.add(parent_process.name())
+                    if parent_process:
+                        parent_name = parent_process.name()
+                        known_launchers = {
+                            'flet.exe', 'fletd.exe',
+                            'pythonw.exe', 'python.exe', 'python3.exe',
+                        }
+                        if parent_name.lower() in known_launchers or parent_name.lower() == expected_name.lower():
+                            process_names.add(parent_name)
                 except Exception:
                     pass
             except Exception as e:
                 if not _is_packaged_app():
                     logger.warning(f"获取进程信息失败: {e}")
-                # 后备方案
-                process_names.add(Path(sys.executable).name)
-        else:
-            # 后备方案：使用可执行文件名
-            process_names.add(Path(sys.executable).name)
-        
+                # 后备方案：继续用 expected_name（已经加进去了）
+
         # 添加常见的 Flet 相关进程名
         process_names.add("flet.exe")
         process_names.add("fletd.exe")
@@ -646,7 +663,12 @@ exit 0
         
         # 定位主程序可执行文件
         # 优先在顶层 / 一级子目录中查找，避免误选 app_packages 里的脚本
-        expected_name = Path(sys.executable).name if _is_packaged_app() else "MTools"
+        # 在 flet build 下 sys.executable 是内嵌 python，必须用真实 exe
+        if _is_packaged_app():
+            from utils.platform_utils import get_real_executable_path
+            expected_name = get_real_executable_path().name
+        else:
+            expected_name = "MTools"
         main_exe = self._find_unix_main_exe(source_dir, expected_name)
         
         if main_exe:
@@ -656,12 +678,17 @@ exit 0
             main_exe = target_dir / expected_name
         
         # 获取当前进程名
+        # 优先使用真实的主程序 exe 名，避免拿到内嵌 python 解释器名
+        process_name = expected_name
         if HAS_PSUTIL:
-            current_process = psutil.Process()
-            process_name = current_process.name()
-        else:
-            # 后备方案：使用可执行文件名
-            process_name = Path(sys.executable).name
+            try:
+                current_process = psutil.Process()
+                psutil_name = current_process.name()
+                # 只有当 psutil 拿到的不是 python 解释器时才覆盖
+                if psutil_name.lower() not in ('python', 'python3', 'python3.12', 'python.exe', 'python3.exe'):
+                    process_name = psutil_name
+            except Exception:
+                pass
         
         # 目标主程序路径
         target_exe = target_dir / main_exe.name
