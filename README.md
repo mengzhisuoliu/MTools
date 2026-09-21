@@ -38,6 +38,11 @@ Base URL：<code>https://api.atlascloud.ai/v1</code> · <a href="./docs/ai_provi
 </picture>
 </a><br>
 <b><a href="https://www.dkdun.cn/">林枫云 www.dkdun.cn</a></b> — 提供稳定的云服务器资源，支持本项目运行
+<br><br>
+<a href="https://dmc.cc/">
+<img src="./assets/dmc_logo.png" alt="DMC" height="48">
+</a><br>
+<b><a href="https://dmc.cc/">DMC dmc.cc</a></b> — 国产开源大模型 API，OpenAI 兼容，适用于字幕修复、AI 翻译等功能
 </div>
 
 ---
@@ -194,6 +199,7 @@ MTools 内置 **Streamable HTTP MCP**，可在应用内开启后供 OpenClaw、H
 
 - **[Atlas Cloud](https://www.atlascloud.ai/)** - 提供 AI API 赞助支持，OpenAI 兼容的多模态推理平台，一个 API 接入 300+ 模型
 - **[林枫云 www.dkdun.cn](https://www.dkdun.cn/)** - 提供稳定的云服务器资源
+- **[DMC dmc.cc](https://dmc.cc/)** - 国产开源大模型 API，OpenAI 兼容
 
 > AI 功能配置说明见 📘 **[AI API 服务商指南](./docs/ai_providers.md)**
 
